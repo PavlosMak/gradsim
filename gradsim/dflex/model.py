@@ -37,7 +37,7 @@ GEO_CAPSULE = 2
 GEO_MESH = 3
 GEO_SDF = 4
 GEO_PLANE = 5
-GEO_NONE = 6       # disabled shape
+GEO_NONE = 6  # disabled shape
 
 
 class Mesh:
@@ -78,10 +78,10 @@ class Mesh:
 
             # quadrature points lie on the line between the
             # centroid and each vertex of the tetrahedron
-            quads = (mid + (p - mid) * alpha, mid + (q - mid) * alpha, mid + (r - mid) * alpha, mid + (com - mid) * alpha)
+            quads = (
+            mid + (p - mid) * alpha, mid + (q - mid) * alpha, mid + (r - mid) * alpha, mid + (com - mid) * alpha)
 
             for j in range(4):
-
                 # displacement of quadrature point from COM
                 d = quads[j] - com
 
@@ -97,6 +97,7 @@ JOINT_PRISMATIC = 0
 JOINT_REVOLUTE = 1
 JOINT_FIXED = 2
 JOINT_FREE = 3
+
 
 # Notation
 # =========
@@ -126,36 +127,36 @@ class ArticulationBuilder:
 
         self.link_count = 0
 
-        self.joint_parent = []         # index of the parent body                      (constant)
-        self.joint_child = []          # index of the child body                       (constant)
-        self.joint_axis = []           # joint axis in child joint frame               (constant)
-        self.joint_X_pj = []           # frame of joint in parent                      (constant)
-        self.joint_X_cm = []           # frame of child com (in child coordinates)     (constant)
-        self.joint_S_s = []            # joint motion subspace in inertial frame       (fk)
+        self.joint_parent = []  # index of the parent body                      (constant)
+        self.joint_child = []  # index of the child body                       (constant)
+        self.joint_axis = []  # joint axis in child joint frame               (constant)
+        self.joint_X_pj = []  # frame of joint in parent                      (constant)
+        self.joint_X_cm = []  # frame of child com (in child coordinates)     (constant)
+        self.joint_S_s = []  # joint motion subspace in inertial frame       (fk)
 
-        self.joint_q_start = []        # joint offset in the q array
-        self.joint_qd_start = []       # joint offset in the qd array
-        self.joint_qd_count = []       # number of dofs for this joint
+        self.joint_q_start = []  # joint offset in the q array
+        self.joint_qd_start = []  # joint offset in the qd array
+        self.joint_qd_count = []  # number of dofs for this joint
         self.joint_type = []
 
-        self.joint_q = []    # generalized coordinates       (input)
-        self.joint_qd = []   # generalized velocities        (input)
+        self.joint_q = []  # generalized coordinates       (input)
+        self.joint_qd = []  # generalized velocities        (input)
         self.joint_qdd = []  # generalized accelerations     (id,fd)
         self.joint_tau = []  # generalized actuation         (input)
-        self.joint_u = []    # generalized total torque      (fd)
+        self.joint_u = []  # generalized total torque      (fd)
 
         self.body_X_sc = []  # body frame                    (fk)
         self.body_X_sm = []  # mass frame                    (fk)
 
         # spatial quantities all expressed in global (spatial,inertial) coordinates
 
-        self.body_v_s = []             # body velocity                 (id)
-        self.body_a_s = []             # body acceleration             (id)
-        self.body_f_s = []             # body force                    (id)
-        self.body_f_ext_s = []         # body external force           (id)
+        self.body_v_s = []  # body velocity                 (id)
+        self.body_a_s = []  # body acceleration             (id)
+        self.body_f_s = []  # body force                    (id)
+        self.body_f_ext_s = []  # body external force           (id)
 
-        self.body_I_m = []   # body inertia (mass frame)     (constant)
-        self.body_I_s = []   # body inertia (space frame)    (fk)
+        self.body_I_m = []  # body inertia (mass frame)     (constant)
+        self.body_I_s = []  # body inertia (space frame)    (fk)
 
     def add_link(self, parent, X_pj, X_cm, axis, type, X_sm, inertia_m, mass):
 
@@ -258,17 +259,14 @@ class ArticulationBuilder:
     def jcalc_transform(self, type, axis, joint_q, start):
 
         if (type == JOINT_REVOLUTE):
-
             q = joint_q[start]
             X_jc = transform((0.0, 0.0, 0.0), quat_from_axis_angle(axis, q))
 
         if (type == JOINT_PRISMATIC):
-
             q = joint_q[start]
             X_jc = transform(axis * q, quat_identity())
 
         if (type == JOINT_FREE):
-
             px = joint_q[start + 0]
             py = joint_q[start + 1]
             pz = joint_q[start + 2]
@@ -346,7 +344,6 @@ class ArticulationBuilder:
             q[q_start] += qd[qd_start] * dt
 
         if (type == JOINT_FREE):
-
             # integrate accelerations
             qd[qd_start + 0] += qdd[qd_start + 0] * dt
             qd[qd_start + 1] += qdd[qd_start + 1] * dt
@@ -446,7 +443,7 @@ class ArticulationBuilder:
 
                 # body velocity, acceleration
                 v_s = v_parent_s + v_j_s
-                a_s = a_parent_s + spatial_cross(v_s, v_j_s)         # + self.joint_S_s[i]*self.joint_qdd[i]
+                a_s = a_parent_s + spatial_cross(v_s, v_j_s)  # + self.joint_S_s[i]*self.joint_qdd[i]
 
                 # compute body forces
                 X_sm = self.body_X_sm[i]
@@ -469,7 +466,6 @@ class ArticulationBuilder:
 
             # compute tau (backwards)
             for i in reversed(range(self.link_count)):
-
                 type = self.joint_type[i]
                 parent = self.joint_parent[i]
 
@@ -512,12 +508,10 @@ class ArticulationBuilder:
     def mass(self):
 
         with ScopedTimer("jacobian", False):
-
             n = self.link_count
             M = np.zeros((n * 6, n * 6))
 
             for i in range(n):
-
                 # diagonal sub-block
                 row_start = i * 6
                 row_end = row_start + 6
@@ -531,7 +525,6 @@ class ArticulationBuilder:
         M = self.mass()
 
         with ScopedTimer("multiply", False):
-
             H = np.dot(np.dot(np.transpose(J), M), J)
             return H
 
@@ -541,11 +534,10 @@ class ArticulationBuilder:
         M = self.crba()
 
         with ScopedTimer("solve", False):
-            self.joint_qdd = np.linalg.solve(M, -c)        # negative bias forces pg. 103 Featherstone
+            self.joint_qdd = np.linalg.solve(M, -c)  # negative bias forces pg. 103 Featherstone
 
         # symplectic Euler update joint coordinates
         for i in range(self.link_count):
-
             type = self.joint_type[i]
             q_start = self.joint_q_start[i]
             qd_start = self.joint_qd_start[i]
@@ -564,7 +556,6 @@ class ArticulationBuilder:
 
         # compute body velocities and accelerations (excluding the base)
         for i in range(self.joint_count):
-
             # velocity across the joint
             v_j_s = self.joint_S_s[i] * self.joint_qd[i]
 
@@ -583,7 +574,6 @@ class ArticulationBuilder:
 
         # compute body forces and inertias
         for i in range(self.body_count):
-
             X_sm = self.body_X_sm[i]
 
             # gravity and external forces (expressed in frame aligned with s but centered at body mass)
@@ -634,7 +624,6 @@ class ArticulationBuilder:
         for i in range(self.body_count):
 
             if (self.body_floating[i] == True):
-
                 # solve for base acceleration (6x6 inv)
                 a_s = -spatial_solve(self.body_I_s[i], self.body_f_s[i])
 
@@ -652,7 +641,6 @@ class ArticulationBuilder:
                 self.body_X_sc[i] = self.body_X_sm[0]
 
         for i in range(self.joint_count):
-
             parent = self.joint_parent[i]
             child = self.joint_child[i]
 
@@ -771,7 +759,6 @@ class Model:
                 scale = self.shape_geo_scale[i]
 
                 for v in mesh.vertices:
-
                     p = (v[0] * scale[0], v[1] * scale[1], v[2] * scale[2])
 
                     add_contact(self.shape_body[i], -1, p, 0.0, i)
@@ -791,7 +778,6 @@ class State:
         pass
 
     def clone(self):
-
         copy = State()
         copy.q = torch.empty_like(self.q)
         copy.u = torch.empty_like(self.u)
@@ -805,7 +791,6 @@ class State:
         return copy
 
     def flatten(self):
-
         return [self.q, self.u, self.rigid_x, self.rigid_r, self.rigid_v, self.rigid_w]
 
 
@@ -879,7 +864,8 @@ class ModelBuilder:
     def add_shape_plane(self, plane, ke=1.e+5, kd=1000.0, kf=1000.0, mu=0.5):
         self.add_shape(-1, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), GEO_PLANE, plane, None, 0.0, ke, kd, kf, mu)
 
-    def add_shape_sphere(self, body, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0, 1.0), radius=1.0, density=1000.0, ke=1.e+5, kd=1000.0, kf=1000.0, mu=0.5):
+    def add_shape_sphere(self, body, pos=(0.0, 0.0, 0.0), rot=(0.0, 0.0, 0.0, 1.0), radius=1.0, density=1000.0,
+                         ke=1.e+5, kd=1000.0, kf=1000.0, mu=0.5):
         self.add_shape(body, pos, rot, GEO_SPHERE, (radius, 0.0, 0.0, 0.0), None, density, ke, kd, kf, mu)
 
     def add_shape_box(self,
@@ -1023,7 +1009,6 @@ class ModelBuilder:
 
         # compute rest angle
         if (rest == None):
-
             x1 = np.array(self.particle_x[i])
             x2 = np.array(self.particle_x[j])
             x3 = np.array(self.particle_x[k])
@@ -1122,7 +1107,7 @@ class ModelBuilder:
             if (e.f0 == -1 or e.f1 == -1):
                 continue
 
-            self.add_edge(e.o0, e.o1, e.v0, e.v1)          # opposite 0, opposite 1, vertex 0, vertex 1
+            self.add_edge(e.o0, e.o1, e.v0, e.v1)  # opposite 0, opposite 1, vertex 0, vertex 1
 
     def add_cloth_mesh(self, pos, rot, scale, vel, vertices, indices, density, edge_callback=None, face_callback=None):
 
@@ -1133,7 +1118,6 @@ class ModelBuilder:
 
         # particles
         for i, v in enumerate(vertices):
-
             p = quat_rotate(rot, v * scale) + pos
 
             self.add_particle(p, vel, 0.0)
@@ -1152,7 +1136,6 @@ class ModelBuilder:
 
             # add area fraction to particles
             if (area > 0.0):
-
                 self.particle_mass[i] += density * area / 3.0
                 self.particle_mass[j] += density * area / 3.0
                 self.particle_mass[k] += density * area / 3.0
@@ -1276,7 +1259,7 @@ class ModelBuilder:
         for k, v in faces.items():
             self.add_triangle(v[0], v[1], v[2])
 
-    def add_soft_mesh(self, pos, rot, scale, vel, vertices, indices, density, k_mu, k_lambda, k_damp):
+    def add_soft_mesh(self, pos, rot, scale, vel, vertices, indices, density, k_mu=1.e+3, k_lambda=1.e+3, k_damp=0.0):
 
         num_tets = int(len(indices) / 4)
 
@@ -1296,7 +1279,6 @@ class ModelBuilder:
 
         # add particles
         for v in vertices:
-
             p = quat_rotate(rot, v * scale) + pos
 
             self.add_particle(p, vel, 0.0)
@@ -1313,7 +1295,6 @@ class ModelBuilder:
 
             # distribute volume fraction to particles
             if (volume > 0.0):
-
                 self.particle_mass[v0] += density * volume / 4.0
                 self.particle_mass[v1] += density * volume / 4.0
                 self.particle_mass[v2] += density * volume / 4.0
@@ -1384,7 +1365,7 @@ class ModelBuilder:
         return (m, I)
 
     def compute_shape_mass(self, type, scale, src, density):
-        if density == 0:     # zero density means fixed
+        if density == 0:  # zero density means fixed
             return 0, np.zeros((3, 3))
 
         if (type == GEO_SPHERE):
@@ -1394,8 +1375,8 @@ class ModelBuilder:
         elif (type == GEO_CAPSULE):
             return self.compute_capsule_inertia(density, scale[0], scale[1] * 2.0)
         elif (type == GEO_MESH):
-            #todo: non-uniform scale of inertia tensor
-            s = scale[0]     # eventually want to compute moment of inertia for mesh.
+            # todo: non-uniform scale of inertia tensor
+            s = scale[0]  # eventually want to compute moment of inertia for mesh.
             return (density * src.mass * s * s * s, density * src.I * s * s * s * s * s)
 
     def transform_inertia(self, m, I, p, q):
@@ -1409,7 +1390,7 @@ class ModelBuilder:
         # find new COM
         new_mass = self.rigid_mass[i] + m
 
-        if new_mass == 0:    # no mass
+        if new_mass == 0:  # no mass
             return
 
         new_com = (self.rigid_com[i] * self.rigid_mass[i] + p * m) / new_mass
@@ -1418,7 +1399,8 @@ class ModelBuilder:
         com_offset = new_com - self.rigid_com[i]
         shape_offset = new_com - p
 
-        new_inertia = self.transform_inertia(self.rigid_mass[i], self.rigid_inertia[i], com_offset, quat_identity()) + self.transform_inertia(
+        new_inertia = self.transform_inertia(self.rigid_mass[i], self.rigid_inertia[i], com_offset,
+                                             quat_identity()) + self.transform_inertia(
             m, I, shape_offset, q)
 
         self.rigid_mass[i] = new_mass
@@ -1448,7 +1430,7 @@ class ModelBuilder:
                 rigid_inv_mass.append(0.0)
                 rigid_inv_inertia.append(np.zeros((3, 3)))
 
-        #-------------------------------------
+        # -------------------------------------
         # construct Model (non-time varying) data
 
         m = Model(adapter)
@@ -1473,7 +1455,7 @@ class ModelBuilder:
         m.shape_rotation = torch.tensor(self.shape_r, dtype=torch.float32, device=adapter)
         m.shape_body = torch.tensor(self.shape_body, dtype=torch.int32, device=adapter)
         m.shape_geo_type = torch.tensor(self.shape_geo_type, dtype=torch.int32, device=adapter)
-        m.shape_geo_src = self.shape_geo_src     # torch.tensor(self.shape_geo_type, dtype=torch.int32, device=adapter)
+        m.shape_geo_src = self.shape_geo_src  # torch.tensor(self.shape_geo_type, dtype=torch.int32, device=adapter)
         m.shape_geo_scale = torch.tensor(self.shape_geo_scale, dtype=torch.float32, device=adapter)
         m.shape_materials = torch.tensor(self.shape_materials, dtype=torch.float32, device=adapter)
 
@@ -1523,7 +1505,7 @@ class ModelBuilder:
         #     from dflex.taichi_backend import TaichiBackend
         #     m.taichi_backend = TaichiBackend(m)
 
-        #-------------------------------------
+        # -------------------------------------
         # construct generalized State (time-varying) vector
 
         return m

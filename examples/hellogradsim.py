@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import kaolin
+
 import imageio
 import numpy as np
 import torch
@@ -7,7 +9,7 @@ from tqdm import trange
 
 from gradsim.bodies import RigidBody
 from gradsim.forces import ConstantForce
-from gradsim.renderutils import SoftRenderer, TriangleMesh
+from gradsim.renderutils import SoftRenderer
 from gradsim.simulator import Simulator
 from gradsim.utils import meshutils
 
@@ -24,7 +26,7 @@ if __name__ == "__main__":
     outfile = cache / "hellogradsim.gif"
 
     # Load a body (from a triangle mesh obj file).
-    mesh = TriangleMesh.from_obj(Path("sampledata/banana.obj"))
+    mesh = kaolin.io.obj.import_mesh("sampledata/banana.obj")
     vertices = meshutils.normalize_vertices(mesh.vertices.unsqueeze(0)).to(device)
     faces = mesh.faces.to(device).unsqueeze(0)
     textures = torch.cat(

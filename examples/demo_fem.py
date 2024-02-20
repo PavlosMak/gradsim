@@ -144,8 +144,8 @@ if __name__ == "__main__":
     phase_step = math.pi / phase_count * 2.0
     phase_freq = 2.5
 
-    # points, tet_indices = read_tet_mesh("cache/tetassets/icosphere.tet")
-    points, tet_indices = read_tet_mesh(args.mesh)
+    points, tet_indices = read_tet_mesh("sampledata/tet/icosphere.tet")
+    # points, tet_indices = read_tet_mesh(args.mesh)
     # print(points)
     # print(tet_indices)
 
