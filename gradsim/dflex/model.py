@@ -1435,7 +1435,7 @@ class ModelBuilder:
 
         m = Model(adapter)
 
-        m.particle_x = torch.tensor(self.particle_x, dtype=torch.float32, device=adapter)
+        m.particle_x = torch.tensor(np.array(self.particle_x), dtype=torch.float32, device=adapter)
         m.particle_v = torch.tensor(self.particle_v, dtype=torch.float32, device=adapter)
         m.particle_mass = torch.tensor(self.particle_mass, dtype=torch.float32, device=adapter)
         m.particle_inv_mass = torch.tensor(particle_inv_mass, dtype=torch.float32, device=adapter)
