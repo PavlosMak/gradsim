@@ -9,9 +9,7 @@ from tqdm import trange
 
 from argparsers import get_dflex_base_parser
 from gradsim import dflex as df
-from gradsim.renderutils import SoftRenderer
-from gradsim.utils.logging import write_imglist_to_dir, write_imglist_to_gif
-from utils import read_tet_mesh
+from utils import load_mesh
 
 LOGGING_INTERVAL = 5
 
@@ -43,7 +41,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--expid", type=str, default="default",
                         help="Unique string identifier for this experiment.", )
-    parser.add_argument("--logdir", type=str, default=os.path.join("cache", "demo-fem"),
+    parser.add_argument("--outdir", type=str, default="output",
                         help="Directory to store experiment logs in.")
     parser.add_argument("--mesh", type=str, default=os.path.join("sampledata", "tet", "icosphere.tet"),
                         help="Path to input mesh file (.tet format).")
@@ -61,30 +59,25 @@ if __name__ == "__main__":
     parser.add_argument("--compare-every", type=int, default=1,
                         help="Interval at which video frames are compared.")
     parser.add_argument("--log", action="store_true", help="Log experiment data.")
+    parser.add_argument("--datadir", type=str, default="output",
+                        help="Directory to store experiment logs in.")
 
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True) # Uncomment to debug backpropagation
 
     device = "cuda:0"
 
-    logdir = os.path.join(args.logdir, args.expid)
-    if args.log:
-        os.makedirs(logdir, exist_ok=True)
-        with open(os.path.join(logdir, "args.txt"), "w") as f:
-            json.dump(args.__dict__, f, indent=2)
+    outdir = args.outdir
+    os.makedirs(outdir, exist_ok=True)
+    with open(os.path.join(outdir, "args.txt"), "w") as f:
+        json.dump(args.__dict__, f, indent=2)
 
     sim_dt = (1.0 / args.physics_engine_rate) / args.sim_substeps
     sim_steps = int(args.sim_duration / sim_dt)
     sim_time = 0.0
-
-    renderer = SoftRenderer(camera_mode="look_at", device=device)
-    camera_distance = 8.0
-    elevation = 30.0
-    azimuth = 0.0
-    renderer.set_eye_from_angles(camera_distance, elevation, azimuth)
 
     render_steps = args.sim_substeps
 
@@ -92,8 +85,7 @@ if __name__ == "__main__":
     phase_step = math.pi / phase_count * 2.0
     phase_freq = 2.5
 
-    points, tet_indices = read_tet_mesh(args.mesh)
-    print(f"Mesh with {len(points)} vertices and {len(tet_indices)} tetrahedra")
+    points, tet_indices = load_mesh(args.mesh)
 
     r = df.quat_multiply(
         df.quat_from_axis_angle((0.0, 0.0, 1.0), math.pi * 0.0),
@@ -104,78 +96,9 @@ if __name__ == "__main__":
     # pos = torch.tensor([0.0, 2.0, 0.0])
     # vel = torch.tensor([1.5, 0.0, 0.0])
 
-    imgs_gt = []
-
-    particle_inv_mass_gt = None
-
-    with torch.no_grad():
-        builder_gt = df.sim.ModelBuilder()
-        builder_gt.add_soft_mesh(
-            pos=(-2.0, 2.0, 0.0),
-            rot=r,
-            scale=1.0,
-            vel=(vx_init.item(), 0.0, 0.0),
-            vertices=points,
-            indices=tet_indices,
-            density=10.0,
-        )
-
-        model_gt = builder_gt.finalize("cpu")
-
-        model_gt.tet_kl = 1000.0
-        model_gt.tet_km = 1000.0
-        model_gt.tet_kd = 1.0
-
-        model_gt.tri_ke = 0.0
-        model_gt.tri_ka = 0.0
-        model_gt.tri_kd = 0.0
-        model_gt.tri_kb = 0.0
-
-        model_gt.contact_ke = 1.0e4
-        model_gt.contact_kd = 1.0
-        model_gt.contact_kf = 10.0
-        model_gt.contact_mu = 0.5
-
-        model_gt.particle_radius = 0.05
-        model_gt.ground = True
-
-        particle_inv_mass_gt = model_gt.particle_inv_mass.clone()
-
-        rest_angle = model_gt.edge_rest_angle
-
-        activation_strength = 0.3
-        activation_penalty = 0.0
-
-        integrator = df.sim.SemiImplicitIntegrator()
-
-        sim_time = 0.0
-
-        state_gt = model_gt.state()
-
-        faces = model_gt.tri_indices
-        textures = torch.cat((
-            torch.ones(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device),
-            torch.ones(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device),
-            torch.zeros(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device)
-        ), dim=-1)
-
-        imgs_gt = []
-        positions_gt = []
-        for i in trange(0, sim_steps):
-            state_gt = integrator.forward(model_gt, state_gt, sim_dt)
-            sim_time += sim_dt
-
-            if i % render_steps == 0:
-                rgba = renderer.forward(state_gt.q.unsqueeze(0).to(device),
-                                        faces.unsqueeze(0).to(device), textures.to(device))
-                imgs_gt.append(rgba)
-                positions_gt.append(state_gt.q)
-        if args.log:
-            write_imglist_to_gif(imgs_gt, os.path.join(logdir, "gt.gif"), imgformat="rgba", verbose=False)
-            write_imglist_to_dir(imgs_gt, os.path.join(logdir, "gt"), imgformat="rgba")
-            np.savetxt(os.path.join(logdir, "mass_gt.txt"), particle_inv_mass_gt.detach().cpu().numpy())
-            np.savetxt(os.path.join(logdir, "vertices.txt"), state_gt.q.detach().cpu().numpy())
-            np.savetxt(os.path.join(logdir, "face.txt"), faces.detach().cpu().numpy())
+    particle_inv_mass_gt = torch.tensor(np.loadtxt(f"{args.datadir}/mass_gt.txt"), dtype=torch.float32)
+    positions_gt = np.load(f"{args.datadir}/positions_gt.npz")["arr_0"]
+    positions_gt = [torch.tensor(p) for p in positions_gt]
 
     massmodel = SimpleModel(
         # particle_inv_mass_gt + 50 * torch.rand_like(particle_inv_mass_gt),
@@ -252,52 +175,23 @@ if __name__ == "__main__":
             sim_time += sim_dt
 
             if i % render_steps == 0:
-                rgba = renderer.forward(
-                    state.q.unsqueeze(0).to(device),
-                    faces.unsqueeze(0).to(device),
-                    textures.to(device),
-                )
-                imgs.append(rgba)
                 positions.append(state.q)
 
-        if args.method == "gradsim":
-            loss = sum(
-                [
-                    lossfn(est, gt)
-                    for est, gt in zip(
-                    imgs[::args.compare_every],
-                    imgs_gt[::args.compare_every]
-                )
-                ]
-            ) / len(imgs[::args.compare_every])
-        elif args.method == "physics-only":
-            loss = sum(
-                [
-                    lossfn(est, gt)
-                    for est, gt in zip(
-                    positions[::args.compare_every],
-                    positions_gt[::args.compare_every]
-                )
-                ]
-            )
-        elif args.method == "noisy-physics-only":
-            loss = sum(
-                [
-                    lossfn(est, gt + torch.rand_like(gt) * 0.1)
-                    for est, gt in zip(
-                    positions[::args.compare_every],
-                    positions_gt[::args.compare_every],
-                )
-                ]
-            )
+        loss = sum(
+            [lossfn(est, gt) for est, gt in zip(positions[::args.compare_every], positions_gt[::args.compare_every])]
+        )
         inv_mass_err = lossfn(model.particle_inv_mass, particle_inv_mass_gt)
         mass_err = lossfn(
             1 / (model.particle_inv_mass + 1e-6), 1 / (particle_inv_mass_gt + 1e-6)
         )
 
+        if e == 0:
+            positions_np = np.array([p.detach().cpu().numpy() for p in positions])
+            np.savez(os.path.join(outdir, "unoptimized.npz"), positions_np)
+
         if e % LOGGING_INTERVAL == 0 or e == args.epochs - 1:
             print(
-                f"[EPOCH: {e:03d}/{args.epochs:03d}] "
+                f"[EPOCH: {(e + 1):03d}/{args.epochs:03d}] "
                 f"Loss: {loss.item():.5f} (Inv) Mass err: {inv_mass_err.item():.5f} "
                 f"Mass err: {mass_err.item():.5f}"
             )
@@ -311,12 +205,14 @@ if __name__ == "__main__":
         mass_errors.append(mass_err.item())
 
         if (args.log and e % LOGGING_INTERVAL == 0) or (e == args.epochs - 1):
-            write_imglist_to_gif(imgs, os.path.join(logdir, f"{e:05d}.gif"), imgformat="rgba")
-            write_imglist_to_dir(imgs, os.path.join(logdir, f"{e:05d}"), imgformat="rgba")
-            np.savetxt(os.path.join(logdir, f"mass_{e:05d}.txt"),
+            np.savetxt(os.path.join(outdir, f"mass_{e:05d}.txt"),
                        model.particle_inv_mass.detach().cpu().numpy())
 
+    # Make and save a numpy array of the states (for ease of loading into Blender)
+    positions_np = np.array([p.detach().cpu().numpy() for p in positions])
+    np.savez(os.path.join(outdir, "predicted.npz"), positions_np)
+
 if args.log:
-    np.savetxt(os.path.join(logdir, "losses.txt"), losses)
-    np.savetxt(os.path.join(logdir, "inv_mass_errors.txt"), inv_mass_errors)
-    np.savetxt(os.path.join(logdir, "mass_errors.txt"), mass_errors)
+    np.savetxt(os.path.join(outdir, "losses.txt"), losses)
+    np.savetxt(os.path.join(outdir, "inv_mass_errors.txt"), inv_mass_errors)
+    np.savetxt(os.path.join(outdir, "mass_errors.txt"), mass_errors)

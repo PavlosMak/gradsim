@@ -134,6 +134,7 @@ gradsim/dflex/kernels
 
 # Misc. directories
 cache/
+output/
 examples/cache/
 .idea/
 *.DS_Store

@@ -2,6 +2,8 @@ import numpy as np
 import pyvista as pv
 import tetgen
 
+from kaolin.io.obj import import_mesh
+
 
 def export_obj(vertices, faces, filepath):
     """
@@ -51,3 +53,12 @@ def tetrahedralize(vertices, faces, order=1, mindihedral=20, minratio=1.5):
     faces = tet.grid.cells_dict[pv.CellType.TETRA]
     faces = [f for face in faces for f in face]
     return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces
+
+
+def load_mesh(path: str):
+    if path.endswith(".tet"):
+        points, tet_indices = read_tet_mesh(path)
+    else:
+        mesh = import_mesh(path)
+        points, tet_indices = tetrahedralize(mesh.vertices, mesh.faces)
+    return points, tet_indices

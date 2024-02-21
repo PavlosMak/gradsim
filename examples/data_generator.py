@@ -3,14 +3,13 @@ import json
 import math
 import os
 
-import kaolin.io.obj
 import numpy as np
 import torch
 from tqdm import trange
 
 from argparsers import get_dflex_base_parser
 from gradsim import dflex as df
-from utils import read_tet_mesh, export_obj, tetrahedralize
+from utils import export_obj, load_mesh
 
 LOGGING_INTERVAL = 5
 
@@ -23,9 +22,7 @@ if __name__ == "__main__":
         parents=[dflex_base_parser], conflict_handler="resolve"
     )
 
-    parser.add_argument("--expid", type=str, default="default",
-                        help="Unique string identifier for this experiment.", )
-    parser.add_argument("--outdir", type=str, default=os.path.join("cache", "demo-fem"),
+    parser.add_argument("--outdir", type=str, default="output",
                         help="Directory to store experiment logs in.")
     parser.add_argument("--mesh", type=str, default=os.path.join("sampledata", "tet", "icosphere.tet"),
                         help="Path to input mesh file (.tet format).")
@@ -40,11 +37,9 @@ if __name__ == "__main__":
 
     torch.manual_seed(args.seed)
 
-    torch.autograd.set_detect_anomaly(True)
-
     device = "cuda:0"
 
-    outdir = os.path.join(args.outdir, args.expid)
+    outdir = args.outdir
     os.makedirs(outdir, exist_ok=True)
     with open(os.path.join(outdir, "args.txt"), "w") as f:
         json.dump(args.__dict__, f, indent=2)
@@ -55,12 +50,8 @@ if __name__ == "__main__":
     phase_step = math.pi / phase_count * 2.0
     phase_freq = 2.5
 
-    if args.mesh.endswith(".tet"):
-        points, tet_indices = read_tet_mesh(args.mesh)
-    else:
-        # TODO: Here we need to load in an obj and tetrahedralize it
-        mesh = kaolin.io.obj.import_mesh(args.mesh)
-        points, tet_indices = tetrahedralize(mesh.vertices, mesh.faces)
+    points, tet_indices = load_mesh(args.mesh)
+
     print(f"Running simulation with {len(points)} particles and {len(tet_indices)} tetrahedra")
 
     r = df.quat_multiply(
@@ -114,11 +105,6 @@ if __name__ == "__main__":
         state_gt = model_gt.state()
 
         faces = model_gt.tri_indices
-        textures = torch.cat((
-            torch.ones(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device),
-            torch.ones(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device),
-            torch.zeros(1, faces.shape[-2], 2, 1, dtype=torch.float32, device=device)
-        ), dim=-1)
 
         sim_dt = (1.0 / args.physics_engine_rate) / args.sim_substeps
         sim_steps = int(args.sim_duration / sim_dt)
@@ -132,11 +118,14 @@ if __name__ == "__main__":
             if i % render_steps == 0:
                 positions_gt.append(state_gt.q)
 
-        # Make and save a numpy array (for ease of loading into blender)
+        # Make and save a numpy array of the states (for ease of loading into Blender)
         positions_gt_np = np.array([gt.cpu().numpy() for gt in positions_gt])
-        np.savez(os.path.join(outdir, "positions.npz"), positions_gt_np)
+        np.savez(os.path.join(outdir, "positions_gt.npz"), positions_gt_np)
+
+        # Export the surface mesh (useful for visualization)
         export_obj(positions_gt_np[0], faces, os.path.join(outdir, "simulation_mesh.obj"))
 
+        # Save ground truth data
         np.savetxt(os.path.join(outdir, "mass_gt.txt"), particle_inv_mass_gt.detach().cpu().numpy())
         np.savetxt(os.path.join(outdir, "vertices.txt"), state_gt.q.detach().cpu().numpy())
         np.savetxt(os.path.join(outdir, "face.txt"), faces.detach().cpu().numpy())
