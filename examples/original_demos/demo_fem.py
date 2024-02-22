@@ -438,7 +438,7 @@ if __name__ == "__main__":
             inv_mass_errors.append(inv_mass_err.item())
             mass_errors.append(mass_err.item())
 
-            if args.log and ((e % save_gif_every == 0) or (e == epochs - 1)):
+            if args.log and ((e % save_gif_every == 0) or (e == args.epochs - 1)):
                 write_imglist_to_gif(
                     imgs, os.path.join(logdir, f"{e:05d}.gif"), imgformat="rgba"
                 )

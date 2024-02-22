@@ -26,9 +26,11 @@ if __name__ == "__main__":
                         help="Directory to store experiment logs in.")
     parser.add_argument("--mesh", type=str, default=os.path.join("sampledata", "tet", "icosphere.tet"),
                         help="Path to input mesh file (.tet format).")
+    parser.add_argument("--sim-config", type=str, default=os.path.join("sampledata", "configs", "spot.json"),
+                        help="Path to simulation configuration variables")
     parser.add_argument("--sim-duration", type=float,
                         default=2.0, help="Duration of the simulation episode.")
-    parser.add_argument("--physics-engine-rate", type=int, default=60,
+    parser.add_argument("--physics-engine-rate", type=int, default=90,
                         help="Number of physics engine `steps` per 1 second of simulator time.")
     parser.add_argument("--sim-substeps", type=int, default=32,
                         help="Number of sub-steps to integrate, per 1 `step` of the simulation.")
@@ -46,39 +48,37 @@ if __name__ == "__main__":
 
     render_steps = args.sim_substeps
 
-    phase_count = 8
-    phase_step = math.pi / phase_count * 2.0
-    phase_freq = 2.5
-
     points, tet_indices = load_mesh(args.mesh)
 
     print(f"Running simulation with {len(points)} particles and {len(tet_indices)} tetrahedra")
+
+    with open(args.sim_config) as config_file:
+        simulation_config = json.load(config_file)
 
     r = df.quat_multiply(
         df.quat_from_axis_angle((0.0, 0.0, 1.0), math.pi * 0.0),
         df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.0),
     )
 
-    vx_init = (1.0 - 3.0) * torch.rand(1) + 3.0
-    # pos = torch.tensor([0.0, 2.0, 0.0])
-    # vel = torch.tensor([1.5, 0.0, 0.0])
-
-    imgs_gt = []
+    position = tuple(simulation_config["position"])
+    velocity = tuple(simulation_config["initial_velocity"])
+    scale = simulation_config["scale"]
+    density = simulation_config["density"]
+    k_mu = simulation_config["mu"]
+    k_lambda = simulation_config["lambda"]
+    k_damp = simulation_config["damp"]
 
     particle_inv_mass_gt = None
 
     with torch.no_grad():
         builder_gt = df.sim.ModelBuilder()
         builder_gt.add_soft_mesh(
-            pos=(-2.0, 2.0, 0.0), rot=r,
-            scale=1.0, vel=(vx_init.item(), 0.0, 0.0),
-            vertices=points, indices=tet_indices, density=10.0)
+            pos=position, rot=r, scale=scale, vel=velocity,
+            vertices=points, indices=tet_indices, density=density,
+            k_mu=k_mu, k_lambda=k_lambda, k_damp=k_damp
+        )
 
         model_gt = builder_gt.finalize("cpu")
-
-        model_gt.tet_kl = 1000.0
-        model_gt.tet_km = 1000.0
-        model_gt.tet_kd = 1.0
 
         model_gt.tri_ke = 0.0
         model_gt.tri_ka = 0.0
@@ -93,12 +93,8 @@ if __name__ == "__main__":
         model_gt.particle_radius = 0.05
         model_gt.ground = True
 
+        # model_gt.particle_inv_mass *= 1 / 50
         particle_inv_mass_gt = model_gt.particle_inv_mass.clone()
-
-        rest_angle = model_gt.edge_rest_angle
-
-        activation_strength = 0.3
-        activation_penalty = 0.0
 
         integrator = df.sim.SemiImplicitIntegrator()
 
@@ -116,6 +112,9 @@ if __name__ == "__main__":
             sim_time += sim_dt
 
             if i % render_steps == 0:
+                if torch.sum(torch.isnan(state_gt.q[:10])) != 0:
+                    raise RuntimeError(f"Nan Detected at step {i}")
+
                 positions_gt.append(state_gt.q)
 
         # Make and save a numpy array of the states (for ease of loading into Blender)
