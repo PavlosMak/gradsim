@@ -47,6 +47,8 @@ if __name__ == "__main__":
                         help="Path to input mesh file (.tet format).")
     parser.add_argument("--sim-duration", type=float,
                         default=2.0, help="Duration of the simulation episode.")
+    parser.add_argument("--sim-config", type=str, default=os.path.join("sampledata", "configs", "spot.json"),
+                        help="Path to simulation configuration variables")
     parser.add_argument("--physics-engine-rate", type=int, default=60,
                         help="Number of physics engine `steps` per 1 second of simulator time.")
     parser.add_argument("--sim-substeps", type=int, default=32,
@@ -105,9 +107,17 @@ if __name__ == "__main__":
         particle_inv_mass_gt + 0.1 * torch.rand_like(particle_inv_mass_gt),
         activation=torch.nn.functional.relu,
     )
-    # epochs = 100
-    save_gif_every = 1
-    # compare_every = 10
+
+    with open(args.sim_config) as config_file:
+        simulation_config = json.load(config_file)
+
+    position = tuple(simulation_config["position"])
+    velocity = tuple(simulation_config["initial_velocity"])
+    scale = simulation_config["scale"]
+    density = simulation_config["density"]
+    k_mu = simulation_config["mu"]
+    k_lambda = simulation_config["lambda"]
+    k_damp = simulation_config["damp"]
 
     optimizer = torch.optim.Adam(massmodel.parameters(), lr=1e-1)
     # optimizer = torch.optim.LBFGS(massmodel.parameters(), lr=1.0, tolerance_grad=1.e-5, tolerance_change=0.01, line_search_fn ="strong_wolfe")
@@ -117,13 +127,16 @@ if __name__ == "__main__":
 
         builder = df.sim.ModelBuilder()
         builder.add_soft_mesh(
-            pos=(-2.0, 2.0, 0.0),
+            pos=position,
             rot=r,
-            scale=1.0,
-            vel=(vx_init.item(), 0.0, 0.0),
+            scale=scale,
+            vel=velocity,
             vertices=points,
             indices=tet_indices,
-            density=10.0,
+            density=density,
+            k_mu=k_mu,
+            k_lambda=k_lambda,
+            k_damp=k_damp
         )
 
         model = builder.finalize("cpu")
