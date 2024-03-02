@@ -395,9 +395,9 @@ if __name__ == "__main__":
                     [
                         lossfn(est, gt)
                         for est, gt in zip(
-                            imgs[::args.compare_every],
-                            imgs_gt[::args.compare_every]
-                        )
+                        imgs[::args.compare_every],
+                        imgs_gt[::args.compare_every]
+                    )
                     ]
                 ) / len(imgs[::args.compare_every])
             elif args.method == "physics-only":
@@ -405,9 +405,9 @@ if __name__ == "__main__":
                     [
                         lossfn(est, gt)
                         for est, gt in zip(
-                            positions[::args.compare_every],
-                            positions_gt[::args.compare_every]
-                        )
+                        positions[::args.compare_every],
+                        positions_gt[::args.compare_every]
+                    )
                     ]
                 )
             elif args.method == "noisy-physics-only":
@@ -415,9 +415,9 @@ if __name__ == "__main__":
                     [
                         lossfn(est, gt + torch.rand_like(gt) * 0.1)
                         for est, gt in zip(
-                            positions[::args.compare_every],
-                            positions_gt[::args.compare_every],
-                        )
+                        positions[::args.compare_every],
+                        positions_gt[::args.compare_every],
+                    )
                     ]
                 )
             inv_mass_err = lossfn(model.particle_inv_mass, particle_inv_mass_gt)

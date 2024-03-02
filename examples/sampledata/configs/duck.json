@@ -1,0 +1,9 @@
+{
+  "position": [0, 0.5, 0],
+  "scale": 1.0,
+  "initial_velocity": [0,0,0],
+  "density": 20.0,
+  "mu": 1.0e4,
+  "lambda": 1.0e4,
+  "damp": 1
+}
