@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
     massmodel = SimpleModel(
         # particle_inv_mass_gt + 50 * torch.rand_like(particle_inv_mass_gt),
-        particle_inv_mass_gt + 0.1 * torch.rand_like(particle_inv_mass_gt),
+        particle_inv_mass_gt + 0.5 * torch.rand_like(particle_inv_mass_gt),
         activation=torch.nn.functional.relu,
     )
 
