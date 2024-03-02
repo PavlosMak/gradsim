@@ -49,7 +49,7 @@ if __name__ == "__main__":
                         default=2.0, help="Duration of the simulation episode.")
     parser.add_argument("--sim-config", type=str, default=os.path.join("sampledata", "configs", "spot.json"),
                         help="Path to simulation configuration variables")
-    parser.add_argument("--physics-engine-rate", type=int, default=60,
+    parser.add_argument("--physics-engine-rate", type=int, default=90,
                         help="Number of physics engine `steps` per 1 second of simulator time.")
     parser.add_argument("--sim-substeps", type=int, default=32,
                         help="Number of sub-steps to integrate, per 1 `step` of the simulation.")
@@ -83,20 +83,12 @@ if __name__ == "__main__":
 
     render_steps = args.sim_substeps
 
-    phase_count = 8
-    phase_step = math.pi / phase_count * 2.0
-    phase_freq = 2.5
-
     points, tet_indices = load_mesh(args.mesh)
 
     r = df.quat_multiply(
         df.quat_from_axis_angle((0.0, 0.0, 1.0), math.pi * 0.0),
         df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.0),
     )
-
-    vx_init = (1.0 - 3.0) * torch.rand(1) + 3.0
-    # pos = torch.tensor([0.0, 2.0, 0.0])
-    # vel = torch.tensor([1.5, 0.0, 0.0])
 
     particle_inv_mass_gt = torch.tensor(np.loadtxt(f"{args.datadir}/mass_gt.txt"), dtype=torch.float32)
     positions_gt = np.load(f"{args.datadir}/positions_gt.npz")["arr_0"]
@@ -120,7 +112,6 @@ if __name__ == "__main__":
     k_damp = simulation_config["damp"]
 
     optimizer = torch.optim.Adam(massmodel.parameters(), lr=1e-1)
-    # optimizer = torch.optim.LBFGS(massmodel.parameters(), lr=1.0, tolerance_grad=1.e-5, tolerance_change=0.01, line_search_fn ="strong_wolfe")
     lossfn = torch.nn.MSELoss()
 
     for e in range(args.epochs):
@@ -157,10 +148,8 @@ if __name__ == "__main__":
 
         model.particle_radius = 0.05
         model.ground = True
-        # model.gravity = torch.tensor((0.0, 0.0, 0.0), dtype=torch.float32, requires_grad=False)
 
         model.particle_inv_mass = massmodel()
-        # print(torch.allclose(massmodel(), particle_mass_gt))
 
         rest_angle = model.edge_rest_angle
 
