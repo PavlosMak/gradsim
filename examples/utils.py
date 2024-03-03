@@ -43,7 +43,7 @@ def read_tet_mesh(filepath):
     return vertices, faces
 
 
-def tetrahedralize(vertices, faces, order=1, mindihedral=20, minratio=1.5):
+def tetrahedralize(vertices, faces, order=1, mindihedral=5, minratio=20):
     # Not the cleanest, but fastest to implement
     verts = vertices.clone().detach().numpy()
     faces = faces.clone().detach().numpy()
