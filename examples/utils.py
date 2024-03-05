@@ -1,6 +1,7 @@
 import numpy as np
 import pyvista as pv
 import tetgen
+import torch
 
 from kaolin.io.obj import import_mesh
 
@@ -49,13 +50,23 @@ def tetrahedralize(vertices, faces, order=1, mindihedral=5, minratio=20):
     faces = faces.clone().detach().numpy()
     pv_mesh = pv.make_tri_mesh(verts, faces=faces)
     tet = tetgen.TetGen(pv_mesh)
-    tet.tetrahedralize(order, mindihedral=mindihedral, minratio=minratio)
+    tet.make_manifold()
+    tet.tetrahedralize()
     faces = tet.grid.cells_dict[pv.CellType.TETRA]
     faces = [f for face in faces for f in face]
     return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces
 
 
-def load_mesh(path: str):
+def load_pseudo_gt_mesh(path: str):
+    path_to_mesh_data = f"{path}/filtered_meshes"
+    # from the obj we will keep the faces
+    mesh = import_mesh(f"{path_to_mesh_data}/filtered_mesh_0.obj")
+    # but load vertex positions from the registered source data
+    verts = torch.tensor(np.loadtxt(f"{path_to_mesh_data}/registered_vertices/registered_source_0.txt", delimiter="\t"))
+    return tetrahedralize(verts, mesh.faces)
+
+
+def load_mesh(path: str, load_from_gaussians=False):
     if path.endswith(".tet"):
         points, tet_indices = read_tet_mesh(path)
     else:

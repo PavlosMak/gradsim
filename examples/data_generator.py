@@ -13,6 +13,15 @@ from utils import export_obj, load_mesh
 
 LOGGING_INTERVAL = 5
 
+
+def get_volume(v0, v1, v2, v3):
+    v1v0 = v1 - v0
+    v2v0 = v2 - v0
+    v3v0 = v3 - v0
+    return 0.166666 * np.dot(np.cross(v1v0, v2v0), v3v0)
+
+
+
 if __name__ == "__main__":
 
     # Get an argument parser with base-level arguments already filled in.
@@ -56,8 +65,8 @@ if __name__ == "__main__":
         simulation_config = json.load(config_file)
 
     r = df.quat_multiply(
-        df.quat_from_axis_angle((0.0, 0.0, 1.0), math.pi * 0.0),
-        df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.0),
+        df.quat_from_axis_angle((0.0, 0.0, 1.0), math.pi * 0),
+        df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0),
     )
 
     position = tuple(simulation_config["position"])
@@ -106,7 +115,22 @@ if __name__ == "__main__":
         sim_steps = int(args.sim_duration / sim_dt)
         sim_time = 0.0
 
+        # DEBUGGING - SAVE INITIAL STATE
+        np.savetxt(f"/home/pavlos/Desktop/stuff/Uni-Masters/thesis/debugging_logs/initial_gt_positions.txt",
+                   state_gt.q.clone().cpu().detach().numpy())
+        # END DEBUGGING
+
+        # for tet in model_gt.tet_indices:
+        #     i0, i1, i2, i3 = tet
+        #     v0 = points[i0]
+        #     v1 = points[i1]
+        #     v2 = points[i2]
+        #     v3 = points[i3]
+        #     volume = get_volume(v0, v1, v2, v3)
+        #     print(volume)
+
         positions_gt = []
+        print(f"Starting centroid: {torch.mean(state_gt.q,dim=0)}")
         for i in trange(0, sim_steps):
             state_gt = integrator.forward(model_gt, state_gt, sim_dt)
             sim_time += sim_dt
@@ -117,6 +141,13 @@ if __name__ == "__main__":
 
                 positions_gt.append(state_gt.q)
 
+
+        # DEBUGGING - PREDICTED POSITIONS
+        positions_np = np.array([p.detach().cpu().numpy() for p in positions_gt])
+        path = f"/home/pavlos/Desktop/stuff/Uni-Masters/thesis/debugging_logs/predicted_positions_gt.npz"
+        np.savez(path, positions_np)
+        # END DEBUGGING
+
         # Make and save a numpy array of the states (for ease of loading into Blender)
         positions_gt_np = np.array([gt.cpu().numpy() for gt in positions_gt])
         np.savez(os.path.join(outdir, "positions_gt.npz"), positions_gt_np)
@@ -126,5 +157,5 @@ if __name__ == "__main__":
 
         # Save ground truth data
         np.savetxt(os.path.join(outdir, "mass_gt.txt"), particle_inv_mass_gt.detach().cpu().numpy())
-        np.savetxt(os.path.join(outdir, "vertices.txt"), state_gt.q.detach().cpu().numpy())
-        np.savetxt(os.path.join(outdir, "face.txt"), faces.detach().cpu().numpy())
+        # np.savetxt(os.path.join(outdir, "vertices.txt"), state_gt.q.detach().cpu().numpy())
+        # np.savetxt(os.path.join(outdir, "face.txt"), faces.detach().cpu().numpy())
