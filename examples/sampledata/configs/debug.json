@@ -1,4 +1,8 @@
 {
+  "mesh": "sampledata/giddy_armadillo.obj",
+  "sim_duration": 2.0,
+  "sim_substeps": 32,
+  "physics_engine_rate": 90,
   "position": [0, 1.4, 0],
   "scale": 3,
   "initial_velocity": [1,-1,0],
