@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     # Load simulation mesh
     points, tet_indices = load_mesh(simulation_config["mesh"])
-    print(f"Running simulation with {len(points)} particles and {len(tet_indices)} tetrahedra")
+    print(f"Running simulation with {len(points)} particles and {len(tet_indices) // 4} tetrahedra")
 
     # Get simulation configurations
     r = df.quat_multiply(

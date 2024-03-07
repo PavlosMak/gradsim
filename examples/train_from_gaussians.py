@@ -14,6 +14,8 @@ from utils import load_pseudo_gt_mesh, export_obj
 
 from scipy.spatial import KDTree
 
+from pytorch3d.loss import chamfer_distance
+
 
 class SimpleModel(torch.nn.Module):
     """A thin wrapper around a parameter, for convenient use with optim. """
@@ -43,9 +45,11 @@ if __name__ == "__main__":
         simulation_config = json.load(config_file)
 
     training_config = simulation_config["training"]
-
     torch.manual_seed(training_config["seed"])
 
+    run = wandb.init(project="Gaussian Inverse Physics", config=training_config)
+    output_directory = f"{training_config['logdir']}/{run.name}"
+    os.makedirs(output_directory)
     # torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
 
     frame_count = training_config["frame_count"]
@@ -59,7 +63,8 @@ if __name__ == "__main__":
     path_to_gt = f"{path_to_exp}/gt"
 
     points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
-    print(f"Fitting simulation with {len(points)} particles and {len(tet_indices)} tetrahedra")
+    tet_count = len(tet_indices) // 4
+    print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
     # r = df.quat_multiply(
     #     df.quat_from_axis_angle((0.0, 1.0, 0.0), math.pi * 1.0),
@@ -69,42 +74,69 @@ if __name__ == "__main__":
     # r = df.quat_identity()
     r = df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)
 
-    positions_gt = []
-    gt_ground_level = torch.inf
+    positions_pseudo_gt = []
+    pseudo_gt_ground_level = torch.inf
     for i in range(frame_count):
         frame_gt_path = f"{path_to_gt}/gt_{i}.txt"
         frame_positions = torch.tensor(np.loadtxt(frame_gt_path, delimiter="\t"), dtype=torch.float32)
         rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
         frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
         frame_min_y = torch.min(frame_positions[:, 1])
-        gt_ground_level = min(frame_min_y, gt_ground_level)
-        positions_gt.append(frame_positions)
+        pseudo_gt_ground_level = min(frame_min_y, pseudo_gt_ground_level)
+        positions_pseudo_gt.append(frame_positions)
+
+    # Load real ground truth for 'eval' and also save it in the output folder of this script
+    gt_positions = \
+        np.load("/media/pavlos/One Touch/datasets/inverse_physics_results/scarlett-terrain-117/positions_gt.npz")[
+            "arr_0"]
+    np.savez(f"{training_config['logdir']}/gt_positions.npz", gt_positions)
+    gt_positions = torch.tensor(gt_positions)
+    gt_positions = gt_positions[:frame_count]
+
+    gt_chamfer_distance = chamfer_distance(torch.stack(positions_pseudo_gt), gt_positions, batch_reduction="mean")[0]
+    print(f"Pseudo GT Chamfer Distance: {gt_chamfer_distance.item()}")
 
     # Correct point coordinate system
     points = (df.quat_to_matrix(r) @ points.transpose(1, 0)).transpose(1, 0)
     # Correct for ground offset
-    gt_ground_offset_np = np.array([0, -gt_ground_level, 0], dtype=np.float32)
+    gt_ground_offset_np = np.array([0, -pseudo_gt_ground_level, 0], dtype=np.float32)
     points += gt_ground_offset_np
     gt_ground_offset = torch.tensor(gt_ground_offset_np)
-    positions_gt = [p + gt_ground_offset for p in positions_gt]
+    positions_pseudo_gt = [p + gt_ground_offset for p in positions_pseudo_gt]
 
     # Log ground truth positions
-    positions_np = np.array([p.detach().cpu().numpy() for p in positions_gt])
-    np.savez(f"{training_config['logdir']}/gt_positions.npz", positions_np)
+    positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
+    np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
 
     # For every point in the simulated mesh we need to find the corresponding point in the GT
     tree = KDTree(points)
     common_indices = []
-    for p in positions_gt[0]:
+    for p in positions_pseudo_gt[0]:
         _, index = tree.query(p)
         common_indices.append(index)
 
-    # Initial models
+    # Initialize models
     mass_model = SimpleModel(
         100 * torch.rand(points.shape[0]),
         activation=torch.nn.functional.relu
     )
     velocity_model = SimpleModel(torch.rand((points.shape[0], 3)))
+    # k_mu_model = SimpleModel(
+    #     1e4 * torch.rand(tet_count),
+    #     activation=torch.nn.functional.relu
+    # )
+    # k_lambda_model = SimpleModel(
+    #     1e4 * torch.rand(tet_count),
+    #     activation=torch.nn.functional.relu
+    # )
+    k_mu_model = SimpleModel(
+        1e4 * torch.rand(1),
+        activation=torch.nn.functional.relu
+    )
+    k_lambda_model = SimpleModel(
+        1e4 * torch.rand(1),
+        activation=torch.nn.functional.relu
+    )
 
     position = tuple((0, 0, 0))  # particles are already aligned with GT
     velocity = tuple(simulation_config["initial_velocity"])
@@ -114,10 +146,14 @@ if __name__ == "__main__":
     k_lambda = simulation_config["lambda"]
     k_damp = simulation_config["damp"]
 
-    optimizer = torch.optim.Adam(mass_model.parameters(), lr=training_config["lr"])
-    lossfn = torch.nn.MSELoss()
+    # parameters = [list(mass_model.parameters())[0]]
+    parameters = [list(k_mu_model.parameters())[0],
+                  list(k_lambda_model.parameters())[0],
+                  list(mass_model.parameters())[0],
+                  list(velocity_model.parameters())[0]]
 
-    run = wandb.init(project="Gaussian Inverse Physics")
+    optimizer = torch.optim.Adam(parameters, lr=training_config["lr"])
+    lossfn = torch.nn.MSELoss()
 
     epochs = training_config["epochs"]
     for e in range(epochs):
@@ -141,7 +177,12 @@ if __name__ == "__main__":
         model.ground = True
 
         # Infer model parameters
+        model.particle_v = velocity_model()
+        model.tet_materials[:, 0] = k_mu_model()
+        model.tet_materials[:, 1] = k_lambda_model()
         model.particle_inv_mass = mass_model()
+
+        average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
         integrator = df.sim.SemiImplicitIntegrator()
         sim_time = 0.0
@@ -149,11 +190,10 @@ if __name__ == "__main__":
 
         if e == 0:
             print(f"Starting centroid {torch.mean(state.q, dim=0)}")
-            # print(f"GT 0 centroid {torch.mean(positions_gt[0], dim=0)}")
 
         faces = model.tri_indices
         export_obj(state.q.clone().detach().cpu().numpy(), faces,
-                   os.path.join(training_config["logdir"], "simulation_mesh.obj"))
+                   os.path.join(output_directory, "simulation_mesh.obj"))
 
         positions = []
         losses = []
@@ -171,15 +211,38 @@ if __name__ == "__main__":
         pred_positions = [p[common_indices] for p in positions]
         loss = sum([lossfn(est, gt) for est, gt in
                     zip(pred_positions[::training_config["compare_every"]],
-                        positions_gt[::training_config["compare_every"]])])
+                        positions_pseudo_gt[::training_config["compare_every"]])])
 
         if e == 0:
             positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-            np.savez(os.path.join(training_config["logdir"], "unoptimized.npz"), positions_np)
+            np.savez(os.path.join(output_directory, "unoptimized.npz"), positions_np)
 
         if e % training_config["logging_interval"] == 0 or e == epochs - 1:
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
-            wandb.log({"Loss": loss.item()})
+            velocity_loss = torch.linalg.norm(
+                average_initial_velocity - torch.tensor(simulation_config["initial_velocity"]))
+            print(f"Initial Velocity: {average_initial_velocity} - Initial Velocity Loss: {velocity_loss}")
+
+            predicted_chamfer_distance = chamfer_distance(torch.stack(pred_positions), gt_positions,
+                                                          batch_reduction="mean")[0]
+            print(f"Predic Chamfer Distance: {predicted_chamfer_distance.item()}\n"
+                  f"Pseudo Chamfer Distance: {gt_chamfer_distance.item()}")
+
+            average_mu = torch.mean(model.tet_materials[:, 0])
+            average_lambda = torch.mean(model.tet_materials[:, 1])
+            mu_error = torch.abs(average_mu - simulation_config["mu"])
+            lambda_error = torch.abs(average_lambda - simulation_config["lambda"])
+            print(f"Mu error: {mu_error.item()}, Lambda error: {lambda_error.item()}")
+
+            wandb.log({"Loss": loss.item(),
+                       "Chamfer Distance": predicted_chamfer_distance.item(),
+                       "Initial Velocity Loss": velocity_loss.item(),
+                       "Pseudo GT Chamfer Distace": gt_chamfer_distance.item(),
+                       "Mu error": mu_error.item(),
+                       "Lambda error": lambda_error.item(),
+                       "Mu": model.tet_materials[:, 0][0].item(),
+                       "Lambda": model.tet_materials[:, 1][0].item()
+                       })
 
         loss.backward()
         optimizer.step()
@@ -189,4 +252,12 @@ if __name__ == "__main__":
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
     positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-    np.savez(os.path.join(training_config["logdir"], "predicted.npz"), positions_np)
+    np.savez(os.path.join(output_directory, f"predicted.npz"), positions_np)
+
+    gt_chamfer_distance = chamfer_distance(torch.stack(positions_pseudo_gt), gt_positions, batch_reduction="mean")[0]
+
+    # Save models
+    torch.save(mass_model.state_dict(), f"{output_directory}/mass_model.pth")
+    torch.save(velocity_model.state_dict(), f"{output_directory}/velocity_model.pth")
+    torch.save(k_mu_model.state_dict(), f"{output_directory}/mu_model.pth")
+    torch.save(k_lambda_model.state_dict(), f"{output_directory}/lambda_model.pth")

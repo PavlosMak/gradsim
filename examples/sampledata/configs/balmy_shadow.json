@@ -19,6 +19,6 @@
     "lr": 1e-1,
     "compare_every": 1,
     "logging_interval": 5,
-    "logdir": "output"
+    "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results"
   }
 }
