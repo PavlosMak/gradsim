@@ -9,13 +9,10 @@ from tqdm import trange
 
 import wandb
 
-from argparsers import get_dflex_base_parser
 from gradsim import dflex as df
 from utils import load_pseudo_gt_mesh, export_obj, load_mesh
 
 from scipy.spatial import KDTree
-
-LOGGING_INTERVAL = 5
 
 
 def get_volume(v0, v1, v2, v3):
@@ -66,49 +63,51 @@ if __name__ == "__main__":
 
     render_steps = simulation_config["sim_substeps"]
     path_to_exp = f"{training_config['path_to_gt']}/{training_config['exp_name']}"
+    path_to_gt = f"{path_to_exp}/gt"
 
     points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
     print(f"Fitting simulation with {len(points)} particles and {len(tet_indices)} tetrahedra")
 
-    r = df.quat_multiply(
-        df.quat_from_axis_angle((0.0, 1.0, 0.0), math.pi * 1.0),
-        df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 1.0),  # we need to reflect around the x-axis
-    )
+    # r = df.quat_multiply(
+    #     df.quat_from_axis_angle((0.0, 1.0, 0.0), math.pi * 1.0),
+    #     df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 1.0),  # we need to reflect around the x-axis
+    # )
 
-    path_to_gt = f"{path_to_exp}/gt"
+    # r = df.quat_identity()
+    r = df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)
+
     positions_gt = []
     gt_ground_level = torch.inf
     for i in range(frame_count):
         frame_gt_path = f"{path_to_gt}/gt_{i}.txt"
         frame_positions = torch.tensor(np.loadtxt(frame_gt_path, delimiter="\t"), dtype=torch.float32)
-        frame_positions = frame_positions @ torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
+        rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
+        frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
         frame_min_y = torch.min(frame_positions[:, 1])
         gt_ground_level = min(frame_min_y, gt_ground_level)
         positions_gt.append(frame_positions)
 
     # Correct point coordinate system
-    points = np.array([p @ df.quat_to_matrix(r) for p in points], dtype=np.float32)
+    points = (df.quat_to_matrix(r) @ points.transpose(1, 0)).transpose(1, 0)
     # Correct for ground offset
     gt_ground_offset_np = np.array([0, -gt_ground_level, 0], dtype=np.float32)
     points += gt_ground_offset_np
     gt_ground_offset = torch.tensor(gt_ground_offset_np)
     positions_gt = [p + gt_ground_offset for p in positions_gt]
 
-    # DEBUGGING - GT POSITIONS
+    # Log ground truth positions
     positions_np = np.array([p.detach().cpu().numpy() for p in positions_gt])
-    path = f"/home/pavlos/Desktop/stuff/Uni-Masters/thesis/debugging_logs/full_gt_positions.npz"
-    np.savez(path, positions_np)
-    # END DEBUGGING
+    np.savez(f"{training_config['logdir']}/gt_positions.npz", positions_np)
 
     # For every point in the simulated mesh we need to find the corresponding point in the GT
     tree = KDTree(points)
     common_indices = []
     for p in positions_gt[0]:
-        dist, index = tree.query(p)
+        _, index = tree.query(p)
         common_indices.append(index)
 
     massmodel = SimpleModel(
-        0.1 * torch.rand(points.shape[0]),
+        100 * torch.rand(points.shape[0]),
         activation=torch.nn.functional.relu,
     )
 
@@ -156,14 +155,9 @@ if __name__ == "__main__":
             print(f"Starting centroid {torch.mean(state.q, dim=0)}")
             print(f"GT 0 centroid {torch.mean(positions_gt[0], dim=0)}")
 
-        # # DEBUGGING - SAVE INITIAL STATE AND FIRST FRAME GT
-        np.savetxt(f"/home/pavlos/Desktop/stuff/Uni-Masters/thesis/debugging_logs/initial_positions.txt",
-                   state.q.clone().cpu().detach().numpy())
-        # END DEBUGGING
-
-        outdir = "output"
         faces = model.tri_indices
-        export_obj(state.q.clone().detach().cpu().numpy(), faces, os.path.join(outdir, "simulation_mesh.obj"))
+        export_obj(state.q.clone().detach().cpu().numpy(), faces,
+                   os.path.join(training_config["logdir"], "simulation_mesh.obj"))
 
         positions = []
         losses = []
@@ -177,6 +171,7 @@ if __name__ == "__main__":
 
             if i % render_steps == 0:
                 positions.append(state.q)
+
         pred_positions = [p[common_indices] for p in positions]
         loss = sum([lossfn(est, gt) for est, gt in
                     zip(pred_positions[::training_config["compare_every"]],
@@ -184,14 +179,9 @@ if __name__ == "__main__":
 
         if e == 0:
             positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-            np.savez(os.path.join(outdir, "unoptimized.npz"), positions_np)
+            np.savez(os.path.join(training_config["logdir"], "unoptimized.npz"), positions_np)
 
         if e % training_config["logging_interval"] == 0 or e == epochs - 1:
-            # DEBUGGING - PREDICTED POSITIONS
-            positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-            path = f"/home/pavlos/Desktop/stuff/Uni-Masters/thesis/debugging_logs/predicted_positions.npz"
-            np.savez(path, positions_np)
-            # END DEBUGGING
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             wandb.log({"Loss": loss.item()})
 
@@ -203,4 +193,4 @@ if __name__ == "__main__":
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
     positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-    np.savez(os.path.join(outdir, "predicted.npz"), positions_np)
+    np.savez(os.path.join(training_config["logdir"], "predicted.npz"), positions_np)
