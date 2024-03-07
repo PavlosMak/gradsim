@@ -14,10 +14,10 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation",
     "exp_name": "balmy-shadow-234",
     "frame_count": 25,
-    "epochs": 500,
+    "epochs": 100,
     "seed": 42,
     "lr": 1e-1,
-    "compare_every": 2,
+    "compare_every": 1,
     "logging_interval": 5,
     "logdir": "output"
   }

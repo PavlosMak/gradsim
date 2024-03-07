@@ -10,16 +10,9 @@ from tqdm import trange
 import wandb
 
 from gradsim import dflex as df
-from utils import load_pseudo_gt_mesh, export_obj, load_mesh
+from utils import load_pseudo_gt_mesh, export_obj
 
 from scipy.spatial import KDTree
-
-
-def get_volume(v0, v1, v2, v3):
-    v1v0 = v1 - v0
-    v2v0 = v2 - v0
-    v3v0 = v3 - v0
-    return 0.166666 * np.dot(np.cross(v1v0, v2v0), v3v0)
 
 
 class SimpleModel(torch.nn.Module):
@@ -106,10 +99,12 @@ if __name__ == "__main__":
         _, index = tree.query(p)
         common_indices.append(index)
 
-    massmodel = SimpleModel(
+    # Initial models
+    mass_model = SimpleModel(
         100 * torch.rand(points.shape[0]),
-        activation=torch.nn.functional.relu,
+        activation=torch.nn.functional.relu
     )
+    velocity_model = SimpleModel(torch.rand((points.shape[0], 3)))
 
     position = tuple((0, 0, 0))  # particles are already aligned with GT
     velocity = tuple(simulation_config["initial_velocity"])
@@ -119,7 +114,7 @@ if __name__ == "__main__":
     k_lambda = simulation_config["lambda"]
     k_damp = simulation_config["damp"]
 
-    optimizer = torch.optim.Adam(massmodel.parameters(), lr=training_config["lr"])
+    optimizer = torch.optim.Adam(mass_model.parameters(), lr=training_config["lr"])
     lossfn = torch.nn.MSELoss()
 
     run = wandb.init(project="Gaussian Inverse Physics")
@@ -145,7 +140,8 @@ if __name__ == "__main__":
         model.particle_radius = 0.05
         model.ground = True
 
-        model.particle_inv_mass = massmodel()
+        # Infer model parameters
+        model.particle_inv_mass = mass_model()
 
         integrator = df.sim.SemiImplicitIntegrator()
         sim_time = 0.0
@@ -153,7 +149,7 @@ if __name__ == "__main__":
 
         if e == 0:
             print(f"Starting centroid {torch.mean(state.q, dim=0)}")
-            print(f"GT 0 centroid {torch.mean(positions_gt[0], dim=0)}")
+            # print(f"GT 0 centroid {torch.mean(positions_gt[0], dim=0)}")
 
         faces = model.tri_indices
         export_obj(state.q.clone().detach().cpu().numpy(), faces,
