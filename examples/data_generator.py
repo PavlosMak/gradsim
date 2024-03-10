@@ -103,4 +103,4 @@ if __name__ == "__main__":
         export_obj(positions_gt_np[0], faces, os.path.join(outdir, "simulation_mesh.obj"))
 
         # Save ground truth data
-        np.savetxt(os.path.join(outdir, "mass_gt.txt"), particle_inv_mass.detach().cpu().numpy())
+        np.savetxt(os.path.join(outdir, "inv_masses_gt.txt"), particle_inv_mass.detach().cpu().numpy())

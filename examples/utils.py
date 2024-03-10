@@ -73,3 +73,23 @@ def load_mesh(path: str, load_from_gaussians=False):
         mesh = import_mesh(path)
         points, tet_indices = tetrahedralize(mesh.vertices, mesh.faces)
     return points, tet_indices
+
+
+def get_tet_volume(v0, v1, v2, v3):
+    v1v0 = v1 - v0
+    v2v0 = v2 - v0
+    v3v0 = v3 - v0
+    return 0.1666 * torch.dot(torch.linalg.cross(v1v0, v2v0), v3v0)
+
+
+def get_volumes(tet_indices, vertex_buffer):
+    tet_volumes = []
+    index = 0
+    while index < len(tet_indices):
+        i0 = tet_indices[index]
+        i1 = tet_indices[index + 1]
+        i2 = tet_indices[index + 2]
+        i3 = tet_indices[index + 3]
+        index += 4
+        tet_volumes.append(get_tet_volume(vertex_buffer[i0], vertex_buffer[i1], vertex_buffer[i2], vertex_buffer[i3]))
+    return torch.stack(tet_volumes)

@@ -20,7 +20,7 @@
   "damp": 1,
   "training": {
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation",
-    "exp_name": "balmy-shadow-234",
+    "exp_name": "balmy-shadow-234-cors",
     "frame_count": 25,
     "epochs": 500,
     "seed": 42,
