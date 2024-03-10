@@ -20,6 +20,8 @@
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
-    "sim_scale": 3
+    "sim_scale": 3,
+    "E": 1e6,
+    "nu": 0.3
   }
 }

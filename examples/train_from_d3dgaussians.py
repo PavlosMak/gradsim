@@ -10,24 +10,11 @@ from tqdm import trange
 import wandb
 
 from gradsim import dflex as df
-from utils import export_obj, load_mesh
+from utils import export_obj, load_mesh, lossfn, get_ground_truth_lame
 
 from scipy.spatial import KDTree
 
 from pytorch3d.loss import chamfer_distance
-
-
-def lossfn(predicted_positions, gt_positions, index_map):
-    total_loss = torch.zeros(1)
-    frames = predicted_positions.shape[0]
-    for frame in range(frames):
-        loss = torch.zeros(1)
-        for pi in index_map:
-            ni, dist = index_map[pi]
-            loss += (torch.linalg.norm(predicted_positions[frame][pi] - gt_positions[frame][ni]) - dist) ** 2
-            # loss += torch.linalg.norm(predicted_positions[frame][pi] - gt_positions[frame][ni])
-        total_loss += (loss / len(index_map))
-    return total_loss / frames
 
 
 class SimpleModel(torch.nn.Module):
@@ -46,12 +33,10 @@ class SimpleModel(torch.nn.Module):
         return out
 
 
-def forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model, position, r, scale, velocity,
-                 points,
-                 tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt):
+def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
     builder = df.sim.ModelBuilder()
-    builder.add_soft_mesh(pos=position, rot=r, scale=scale, vel=velocity,
-                          vertices=points, indices=tet_indices, density=density,
+    builder.add_soft_mesh(pos=pos, rot=rot, scale=scale, vel=vel,
+                          vertices=vertices, indices=tet_indices, density=density,
                           k_mu=k_mu, k_lambda=k_lambda, k_damp=k_damp)
     model = builder.finalize("cpu")
 
@@ -68,12 +53,18 @@ def forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model, positio
     model.particle_radius = 0.05
     model.ground = True
 
+    return model
+
+
+def forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model, position, r, scale, velocity,
+                 points,
+                 tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt):
+    model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
     # Infer model parameters
-    # model.particle_v = velocity_model()
     model.particle_v[:, ] = velocity_model()
     model.tet_materials[:, 0] = k_mu_model()
     model.tet_materials[:, 1] = k_lambda_model()
-    # model.particle_inv_mass = mass_model()
+    model.particle_inv_mass = mass_model()
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
@@ -142,7 +133,7 @@ if __name__ == "__main__":
     # r = df.quat_identity()
     r = df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)
     r2 = df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)
-    sim_scale = 3
+    sim_scale = training_config["sim_scale"]
 
     path_to_pseudo_gt = "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/pseudo_gt_positions.npz"
     positions_pseudo_gt = np.load(path_to_pseudo_gt)["arr_0"]
@@ -181,6 +172,9 @@ if __name__ == "__main__":
     positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
     np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
 
+    gt_mu, gt_lambda = get_ground_truth_lame(simulation_config)
+    gt_mu, gt_lambda = torch.tensor(gt_mu), torch.tensor(gt_lambda)
+
     # Create correspondences
     tree = KDTree(positions_pseudo_gt[0])
     index_map = {}
@@ -189,10 +183,22 @@ if __name__ == "__main__":
         index_map[pi] = (index, dist)
 
     # Initialize models
+    position = tuple((0, 0, 0))  # particles are already aligned with GT
+    velocity = tuple(simulation_config["initial_velocity"])
+    scale = 1.0
+    density = simulation_config["density"]
+    k_mu = simulation_config["mu"]
+    k_lambda = simulation_config["lambda"]
+    k_damp = simulation_config["damp"]
+
+    model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
+                          k_lambda, k_damp)
+
     mass_model = SimpleModel(
-        10 * torch.rand(points.shape[0]),
+        model.particle_inv_mass + 10 * torch.rand_like(model.particle_inv_mass),
         activation=torch.nn.functional.relu
     )
+
     initial_velocity_estimate = torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
     velocity_model = SimpleModel(initial_velocity_estimate)
     k_mu_model = SimpleModel(
@@ -203,14 +209,6 @@ if __name__ == "__main__":
         1e5 * torch.rand(1),
         activation=torch.nn.functional.relu
     )
-
-    position = tuple((0, 0, 0))  # particles are already aligned with GT
-    velocity = tuple(simulation_config["initial_velocity"])
-    scale = 1.0
-    density = simulation_config["density"]
-    k_mu = simulation_config["mu"]
-    k_lambda = simulation_config["lambda"]
-    k_damp = simulation_config["damp"]
 
     parameters = [
         list(k_mu_model.parameters())[0],
@@ -239,7 +237,6 @@ if __name__ == "__main__":
                                                                          k_mu, k_lambda, k_damp,
                                                                          training_sim_steps, sim_dt)
 
-        # loss = chamfer_distance(positions, positions_pseudo_gt)[0]
         loss = lossfn(positions, positions_pseudo_gt, index_map)
 
         if e % training_config["logging_interval"] == 0 or e == epochs - 1:
@@ -248,10 +245,15 @@ if __name__ == "__main__":
             average_mu = torch.mean(model.tet_materials[:, 0])
             average_lambda = torch.mean(model.tet_materials[:, 1])
 
+            mu_loss = torch.abs(torch.log10(average_mu) - torch.log10(gt_mu))
+            lambda_loss = torch.abs(torch.log10(average_lambda) - torch.log10(gt_lambda))
+
             wandb.log({"Loss": loss.item(),
                        "Pseudo GT Chamfer Distace": gt_chamfer_distance.item(),
                        "Mu": average_mu,
-                       "Lambda": average_lambda})
+                       "Mu Abs Error Log10": mu_loss,
+                       "Lambda": average_lambda,
+                       "Lambda Abs Error Log10": lambda_loss})
 
         loss.backward()
         optimizer.step()
@@ -270,8 +272,7 @@ if __name__ == "__main__":
     # Evaluate
     with torch.no_grad():
         positions, _, _, _ = forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model,
-                                          position,
-                                          df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
-                                          k_lambda, k_damp, eval_sim_steps, sim_dt)
+                                          position, df.quat_identity(), scale, velocity, points,
+                                          tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt)
         positions_np = np.array([p.detach().cpu().numpy() for p in positions])
         np.savez(f"{output_directory}/eval.npz", positions_np)

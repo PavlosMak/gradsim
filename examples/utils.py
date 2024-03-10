@@ -93,3 +93,36 @@ def get_volumes(tet_indices, vertex_buffer):
         index += 4
         tet_volumes.append(get_tet_volume(vertex_buffer[i0], vertex_buffer[i1], vertex_buffer[i2], vertex_buffer[i3]))
     return torch.stack(tet_volumes)
+
+
+def lossfn(predicted_positions, gt_positions, index_map):
+    total_loss = torch.zeros(1)
+    frames = predicted_positions.shape[0]
+    for frame in range(frames):
+        loss = torch.zeros(1)
+        for pi in index_map:
+            ni, dist = index_map[pi]
+            loss += (torch.linalg.norm(predicted_positions[frame][pi] - gt_positions[frame][ni]) - dist) ** 2
+        total_loss += (loss / len(index_map))
+    return total_loss / frames
+
+
+def lame_from_young(E: float, nu: float):
+    """
+    Calculate the Lame parameters from Young's modulus
+    and Poisson ratio
+    Args:
+        E: Young's modulus
+        nu: Poisson ratio
+    Returns: (mu, lambda)
+    """
+    mu = E / (2 * (1 + nu))
+    lam = (E * nu) / ((1 + nu) * (1 - 2 * nu))
+    return mu, lam
+
+
+def get_ground_truth_lame(simulation_config: dict) -> (float, float):
+    if "E" in simulation_config["training"] and "nu" in simulation_config["training"]:
+        training_config = simulation_config["training"]
+        return lame_from_young(training_config["E"], training_config["nu"])
+    return simulation_config["mu"], simulation_config["lambda"]
