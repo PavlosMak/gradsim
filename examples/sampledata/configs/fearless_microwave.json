@@ -3,25 +3,35 @@
   "sim_duration": 2.0,
   "sim_substeps": 400,
   "physics_engine_rate": 24,
-  "position": [0, 1.4, 0],
+  "position": [
+    0,
+    1.4,
+    0
+  ],
   "scale": 3,
-  "initial_velocity": [1, -1, 0],
+  "initial_velocity": [
+    1,
+    -1,
+    0
+  ],
   "density": 10.0,
   "mu": 1.0e4,
   "lambda": 1.0e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/pseudo_gt_positions.npz",
     "exp_name": "fearless-microwave",
     "frame_count": 14,
-    "epochs": 50,
+    "epochs": 1,
     "seed": 42,
     "lr": 1e-1,
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
-    "sim_scale": 3,
+    "sim_scale": 7,
     "E": 1e6,
-    "nu": 0.3
+    "nu": 0.3,
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/alpha_wrap.obj",
+    "eval_for": 20
   }
 }

@@ -51,7 +51,8 @@ def tetrahedralize(vertices, faces, order=1, mindihedral=5, minratio=20):
     pv_mesh = pv.make_tri_mesh(verts, faces=faces)
     tet = tetgen.TetGen(pv_mesh)
     tet.make_manifold()
-    tet.tetrahedralize()
+    tet.tetrahedralize(mindihedral=5, minratio=20)
+    # tet.tetrahedralize()
     faces = tet.grid.cells_dict[pv.CellType.TETRA]
     faces = [f for face in faces for f in face]
     return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces
