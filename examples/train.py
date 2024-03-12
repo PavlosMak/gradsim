@@ -14,6 +14,8 @@ from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh
 
 from scipy.spatial import KDTree
 
+from logging_utils import wandb_log_curve
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", type=str, default="output",
@@ -29,6 +31,7 @@ if __name__ == "__main__":
     torch.manual_seed(training_config["seed"])
 
     run = wandb.init(project="Gaussian Inverse Physics", config=training_config)
+
     output_directory = f"{training_config['logdir']}/{run.name}"
     os.makedirs(output_directory)
     # torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
@@ -49,23 +52,28 @@ if __name__ == "__main__":
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
-    r = df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)
-    r2 = df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)
+    r = eval(training_config["gt_rotation"])
+    r2 = eval(training_config["sim_mesh_rotation"])
     sim_scale = training_config["sim_scale"]
 
     path_to_gt = training_config["path_to_gt"]
     positions_pseudo_gt = np.load(path_to_gt)["arr_0"]
     edited_positions = []
-    training_frame_count = positions_pseudo_gt.shape[0]
-    for i in range(training_frame_count):
-        frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
-        rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
-        frame_positions = sim_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
-        edited_positions.append(frame_positions)
-    positions_pseudo_gt = torch.stack(edited_positions)
-    floor_level_offset = torch.zeros(3)
-    floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
-    positions_pseudo_gt -= floor_level_offset
+    if "transform_gt_points" in training_config:
+        for i in range(training_frame_count):
+            frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
+            rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
+            # frame_positions = sim_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
+            # TODO: MAKE CONTROL OF GT SCALE SEPARATE
+            frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
+            edited_positions.append(frame_positions)
+        positions_pseudo_gt = torch.stack(edited_positions)
+        # TODO: ALSO MAKE THIS NICER
+        # floor_level_offset = torch.zeros(3)
+        # floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
+        # positions_pseudo_gt -= floor_level_offset
+    else:
+        positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
 
     full_frame_count = training_config["eval_for"]
     eval_sim_duration = full_frame_count / simulation_config["physics_engine_rate"]
@@ -107,8 +115,10 @@ if __name__ == "__main__":
 
     initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
     velocity_model = SimpleModel(initial_velocity_estimate)
-    k_mu_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
-    k_lambda_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
+    # k_mu_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
+    # k_lambda_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
+    k_mu_model = SimpleModel(torch.tensor(1e4), activation=torch.nn.functional.relu, update_scale=10)
+    k_lambda_model = SimpleModel(torch.tensor(1e4), activation=torch.nn.functional.relu, update_scale=10)
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
@@ -120,46 +130,61 @@ if __name__ == "__main__":
     parameters = [
         list(k_mu_model.parameters())[0],
         list(k_lambda_model.parameters())[0],
-        list(mass_model.parameters())[0],
-        list(velocity_model.parameters())[0],
+        # list(mass_model.parameters())[0],
+        # list(velocity_model.parameters())[0],
     ]
 
     optimizer = torch.optim.Adam(parameters, lr=training_config["lr"])
 
     # Do one run before training to get full duration unoptimized
     with torch.no_grad():
-        unoptimized_positions, _, _, _ = forward_pass(velocity_model, k_mu_model, k_lambda_model,
-                                                      mass_model, position, df.quat_identity(),
+        unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
-                                                      sim_dt, render_steps)
+                                                      sim_dt, render_steps, velocity_model, k_mu_model, k_lambda_model,
+                                                      mass_model)
         positions_np = np.array([p.detach().cpu().numpy() for p in unoptimized_positions])
         np.savez(os.path.join(output_directory, "unoptimized.npz"), positions_np)
 
     epochs = training_config["epochs"]
+    losses = []
+    mu_estimates = []
+    lambda_esimates = []
+
+    mse = torch.nn.MSELoss(reduction="sum")
+
     for e in range(epochs):
-        positions, model, state, average_initial_velocity = forward_pass(velocity_model, k_mu_model, k_lambda_model,
-                                                                         mass_model, position, df.quat_identity(),
+        positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
-                                                                         training_sim_steps, sim_dt, render_steps)
+                                                                         training_sim_steps, sim_dt, render_steps,
+                                                                         velocity_model, k_mu_model, k_lambda_model,
+                                                                         mass_model)
 
-        loss = lossfn(positions, positions_pseudo_gt, index_map)
+        # loss = lossfn(positions, positions_pseudo_gt, index_map)
+        loss = mse(positions, positions_pseudo_gt[:training_frame_count])
 
         if e % training_config["logging_interval"] == 0 or e == epochs - 1:
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
+            losses.append(loss.item())
 
             estimated_mu = torch.mean(model.tet_materials[:, 0])
             estimated_lambda = torch.mean(model.tet_materials[:, 1])
 
+            mu_estimates.append(estimated_mu.item())
+            lambda_esimates.append(estimated_lambda.item())
+
             mu_loss = torch.log10(torch.abs(estimated_mu - gt_mu))
             lambda_loss = torch.log10(torch.abs(estimated_lambda - gt_lambda))
+
+            velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
 
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
                        "Mu Abs Error Log10": mu_loss,
                        "Lambda": estimated_lambda,
-                       "Lambda Abs Error Log10": lambda_loss})
+                       "Lambda Abs Error Log10": lambda_loss,
+                       "Velocity Estimate Difference": velocity_estimate_difference})
 
         loss.backward()
         optimizer.step()
@@ -177,9 +202,12 @@ if __name__ == "__main__":
 
     # Evaluate
     with torch.no_grad():
-        positions, _, _, _ = forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model,
-                                          position, df.quat_identity(), scale, velocity, points,
+        positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
-                                          render_steps)
+                                          render_steps, velocity_model, k_mu_model, k_lambda_model, mass_model)
         positions_np = np.array([p.detach().cpu().numpy() for p in positions])
         np.savez(f"{output_directory}/eval.npz", positions_np)
+
+    # Log loss landscapes
+    wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
+    wandb_log_curve(lambda_esimates, losses, "lambda", "Loss", "Lambda Loss Landscape", id="lambda_losses")

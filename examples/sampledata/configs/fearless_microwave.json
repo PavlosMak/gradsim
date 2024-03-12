@@ -28,10 +28,13 @@
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
-    "sim_scale": 7,
+    "sim_scale": 1,
     "E": 1e6,
     "nu": 0.3,
     "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/alpha_wrap.obj",
-    "eval_for": 20
+    "eval_for": 20,
+    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
+    "transform_gt_points": true
   }
 }

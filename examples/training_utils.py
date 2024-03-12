@@ -43,15 +43,20 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
     return model
 
 
-def forward_pass(velocity_model, k_mu_model, k_lambda_model, mass_model, position, r, scale, velocity,
-                 points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps):
+def forward_pass(position, r, scale, velocity,
+                 points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
+                 velocity_model=None, k_mu_model=None, k_lambda_model=None, mass_model=None):
     model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
-    # Infer model parameters
-    model.particle_v[:, ] = velocity_model()
-    model.tet_materials[:, 0] = k_mu_model()
-    model.tet_materials[:, 1] = k_lambda_model()
-    model.particle_inv_mass = mass_model()
 
+    # if velocity_model:
+    #     model.particle_v[:, ] = velocity_model()
+    if k_mu_model:
+        model.tet_materials[:, 0] = k_mu_model()
+    if k_lambda_model:
+        model.tet_materials[:, 1] = k_lambda_model()
+    # if mass_model:
+    #     model.particle_inv_mass = mass_model()
+    #
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
     integrator = df.sim.SemiImplicitIntegrator()
