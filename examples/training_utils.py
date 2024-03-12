@@ -2,6 +2,7 @@ import torch
 from tqdm import trange
 
 from gradsim import dflex as df
+from typing import List
 
 
 class SimpleModel(torch.nn.Module):
@@ -18,6 +19,33 @@ class SimpleModel(torch.nn.Module):
         if self.activation is not None:
             return self.activation(out) + 1e-8
         return out
+
+
+class PhysicalModel(torch.nn.Module):
+    def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
+                 update_scale_velocity=0.1, update_scale_masses=0.1):
+        super(PhysicalModel, self).__init__()
+        self.mu_update = torch.nn.Parameter(torch.rand_like(initial_mu) * update_scale_lame)
+        self.initial_mu = initial_mu
+
+        self.initial_lambda = initial_lambda
+        self.lambda_update = torch.nn.Parameter(torch.rand_like(initial_lambda) * update_scale_lame)
+
+        self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
+        self.initial_velocity = initial_velocity
+
+        self.initial_masses = initial_masses
+        self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
+
+    def forward(self):
+        out_mu = torch.nn.functional.relu(self.mu_update + self.initial_mu) + 1e-8
+        out_lambda = torch.nn.functional.relu(self.lambda_update + self.initial_lambda) + 1e-8
+
+        out_velocity = self.velocity_update + self.initial_velocity
+
+        out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
+
+        return out_mu, out_lambda, out_velocity, out_masses
 
 
 def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
@@ -45,18 +73,16 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
-                 velocity_model=None, k_mu_model=None, k_lambda_model=None, mass_model=None):
+                 prediction_model=None):
     model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
 
-    # if velocity_model:
-    #     model.particle_v[:, ] = velocity_model()
-    if k_mu_model:
-        model.tet_materials[:, 0] = k_mu_model()
-    if k_lambda_model:
-        model.tet_materials[:, 1] = k_lambda_model()
-    # if mass_model:
-    #     model.particle_inv_mass = mass_model()
-    #
+    if prediction_model:
+        k_mu, k_lambda, velocity, masses = prediction_model()
+        model.tet_materials[:, 0] = k_mu
+        model.tet_materials[:, 1] = k_lambda
+        model.particle_v[:, ] = velocity
+        model.particle_inv_mass = masses
+
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
     integrator = df.sim.SemiImplicitIntegrator()
@@ -76,3 +102,12 @@ def forward_pass(position, r, scale, velocity,
     positions = torch.stack(positions)
 
     return positions, model, state, average_initial_velocity
+
+
+def initialize_optimizer(training_config: dict, model: PhysicalModel):
+    param_groups = [
+        {'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]},
+        {'params': [model.initial_velocity], 'lr': training_config["lr"]["velocity"]},
+        {'params': [model.initial_masses], 'lr': training_config["lr"]["mass"]}
+    ]
+    return torch.optim.Adam(param_groups)

@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 import wandb
-from examples.training_utils import model_factory, SimpleModel, forward_pass
+from examples.training_utils import model_factory, SimpleModel, forward_pass, initialize_optimizer, PhysicalModel
 
 from gradsim import dflex as df
 from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh
@@ -108,43 +108,28 @@ if __name__ == "__main__":
     model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
                           k_lambda, k_damp)
 
-    mass_model = SimpleModel(
-        model.particle_inv_mass + 10 * torch.rand_like(model.particle_inv_mass),
-        activation=torch.nn.functional.relu
-    )
-
     initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
-    velocity_model = SimpleModel(initial_velocity_estimate)
-    # k_mu_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
-    # k_lambda_model = SimpleModel(1e5 * torch.rand(1), activation=torch.nn.functional.relu)
-    k_mu_model = SimpleModel(torch.tensor(1e4), activation=torch.nn.functional.relu, update_scale=10)
-    k_lambda_model = SimpleModel(torch.tensor(1e4), activation=torch.nn.functional.relu, update_scale=10)
+    physical_model = PhysicalModel(initial_mu=torch.tensor(1e4) * torch.rand(1),
+                                   initial_lambda=torch.tensor(1e4) * torch.rand(1),
+                                   initial_velocity=torch.tensor([velocity[0], velocity[1], velocity[2]],
+                                                                 dtype=torch.float32),
+                                   initial_masses=model.particle_inv_mass + 10 * torch.rand_like(model.particle_inv_mass),
+                                   update_scale_velocity=0.0, update_scale_lame=10, update_scale_masses=0)
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
-        mass_model.load_state_dict(torch.load(f"{checkpoint_path}/mass_model.pth"))
-        velocity_model.load_state_dict(torch.load(f"{checkpoint_path}/velocity_model.pth"))
-        k_mu_model.load_state_dict(torch.load(f"{checkpoint_path}/mu_model.pth"))
-        k_lambda_model.load_state_dict(torch.load(f"{checkpoint_path}/lambda_model.pth"))
+        physical_model.load_state_dict(torch.load(f"{checkpoint_path}/physical_model.pth"))
 
-    parameters = [
-        list(k_mu_model.parameters())[0],
-        list(k_lambda_model.parameters())[0],
-        # list(mass_model.parameters())[0],
-        # list(velocity_model.parameters())[0],
-    ]
-
-    optimizer = torch.optim.Adam(parameters, lr=training_config["lr"])
+    optimizer = initialize_optimizer(training_config, physical_model)
 
     # Do one run before training to get full duration unoptimized
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
-                                                      sim_dt, render_steps, velocity_model, k_mu_model, k_lambda_model,
-                                                      mass_model)
-        positions_np = np.array([p.detach().cpu().numpy() for p in unoptimized_positions])
-        np.savez(os.path.join(output_directory, "unoptimized.npz"), positions_np)
+                                                      sim_dt, render_steps, physical_model)
+    positions_np = np.array([p.detach().cpu().numpy() for p in unoptimized_positions])
+    np.savez(os.path.join(output_directory, "unoptimized.npz"), positions_np)
 
     epochs = training_config["epochs"]
     losses = []
@@ -158,8 +143,7 @@ if __name__ == "__main__":
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
                                                                          training_sim_steps, sim_dt, render_steps,
-                                                                         velocity_model, k_mu_model, k_lambda_model,
-                                                                         mass_model)
+                                                                         physical_model)
 
         # loss = lossfn(positions, positions_pseudo_gt, index_map)
         loss = mse(positions, positions_pseudo_gt[:training_frame_count])
@@ -174,10 +158,14 @@ if __name__ == "__main__":
             mu_estimates.append(estimated_mu.item())
             lambda_esimates.append(estimated_lambda.item())
 
+            print(f"Mu estimate: {estimated_mu}")
+            print(f"Lambda estimate: {estimated_lambda}")
+
             mu_loss = torch.log10(torch.abs(estimated_mu - gt_mu))
             lambda_loss = torch.log10(torch.abs(estimated_lambda - gt_lambda))
 
             velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
+            print(f"Velocity estimate: {average_initial_velocity}")
 
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
@@ -195,18 +183,15 @@ if __name__ == "__main__":
     np.savez(os.path.join(output_directory, f"predicted.npz"), positions_np)
 
     # Save models
-    torch.save(mass_model.state_dict(), f"{output_directory}/mass_model.pth")
-    torch.save(velocity_model.state_dict(), f"{output_directory}/velocity_model.pth")
-    torch.save(k_mu_model.state_dict(), f"{output_directory}/mu_model.pth")
-    torch.save(k_lambda_model.state_dict(), f"{output_directory}/lambda_model.pth")
+    torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
 
     # Evaluate
     with torch.no_grad():
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
-                                          render_steps, velocity_model, k_mu_model, k_lambda_model, mass_model)
-        positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-        np.savez(f"{output_directory}/eval.npz", positions_np)
+                                          render_steps, physical_model)
+    positions_np = np.array([p.detach().cpu().numpy() for p in positions])
+    np.savez(f"{output_directory}/eval.npz", positions_np)
 
     # Log loss landscapes
     wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
