@@ -173,8 +173,10 @@ if __name__ == "__main__":
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
                        "Mu Abs Error Log10": mu_loss,
+                       "Mu Grad": physical_model.mu_update.grad,
                        "Lambda": estimated_lambda,
                        "Lambda Abs Error Log10": lambda_loss,
+                       "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference})
 
         optimizer.zero_grad()
