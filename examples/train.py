@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 import wandb
-from examples.training_utils import model_factory, SimpleModel, forward_pass, initialize_optimizer, PhysicalModel
+from examples.training_utils import model_factory, forward_pass, initialize_optimizer, PhysicalModel
 
 from gradsim import dflex as df
 from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh
@@ -109,11 +109,12 @@ if __name__ == "__main__":
                           k_lambda, k_damp)
 
     initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
-    physical_model = PhysicalModel(initial_mu=torch.tensor(1e4) * torch.rand(1),
-                                   initial_lambda=torch.tensor(1e4) * torch.rand(1),
+    physical_model = PhysicalModel(initial_mu=torch.tensor(1e4),
+                                   initial_lambda=torch.tensor(1e4),
                                    initial_velocity=torch.tensor([velocity[0], velocity[1], velocity[2]],
                                                                  dtype=torch.float32),
-                                   initial_masses=model.particle_inv_mass + 10 * torch.rand_like(model.particle_inv_mass),
+                                   initial_masses=model.particle_inv_mass + 0.1 * torch.rand_like(
+                                       model.particle_inv_mass),
                                    update_scale_velocity=0.0, update_scale_lame=10, update_scale_masses=0)
 
     if "checkpoint_path" in training_config:
@@ -147,6 +148,8 @@ if __name__ == "__main__":
 
         # loss = lossfn(positions, positions_pseudo_gt, index_map)
         loss = mse(positions, positions_pseudo_gt[:training_frame_count])
+        loss.backward()
+        optimizer.step()
 
         if e % training_config["logging_interval"] == 0 or e == epochs - 1:
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
@@ -174,8 +177,6 @@ if __name__ == "__main__":
                        "Lambda Abs Error Log10": lambda_loss,
                        "Velocity Estimate Difference": velocity_estimate_difference})
 
-        loss.backward()
-        optimizer.step()
         optimizer.zero_grad()
 
     # Make and save a numpy array of the states (for ease of loading into Blender)

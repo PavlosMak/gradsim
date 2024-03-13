@@ -4,23 +4,6 @@ from tqdm import trange
 from gradsim import dflex as df
 from typing import List
 
-
-class SimpleModel(torch.nn.Module):
-    """A thin wrapper around a parameter, for convenient use with optim. """
-
-    def __init__(self, param, activation=None, update_scale=0.1):
-        super(SimpleModel, self).__init__()
-        self.update = torch.nn.Parameter(torch.rand(param.shape) * update_scale)
-        self.param = param
-        self.activation = activation
-
-    def forward(self):
-        out = self.param + self.update
-        if self.activation is not None:
-            return self.activation(out) + 1e-8
-        return out
-
-
 class PhysicalModel(torch.nn.Module):
     def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
                  update_scale_velocity=0.1, update_scale_masses=0.1):
@@ -80,8 +63,8 @@ def forward_pass(position, r, scale, velocity,
         k_mu, k_lambda, velocity, masses = prediction_model()
         model.tet_materials[:, 0] = k_mu
         model.tet_materials[:, 1] = k_lambda
-        model.particle_v[:, ] = velocity
-        model.particle_inv_mass = masses
+        # model.particle_v[:, ] = velocity
+        # model.particle_inv_mass = masses
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
@@ -106,8 +89,8 @@ def forward_pass(position, r, scale, velocity,
 
 def initialize_optimizer(training_config: dict, model: PhysicalModel):
     param_groups = [
-        {'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]},
-        {'params': [model.initial_velocity], 'lr': training_config["lr"]["velocity"]},
-        {'params': [model.initial_masses], 'lr': training_config["lr"]["mass"]}
+        {'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]}#,
+        # {'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
+        # {'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
