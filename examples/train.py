@@ -109,8 +109,11 @@ if __name__ == "__main__":
                           k_lambda, k_damp)
 
     initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
-    physical_model = PhysicalModel(initial_mu=torch.tensor(1e4),
-                                   initial_lambda=torch.tensor(1e4),
+
+    # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
+    initial_mu = torch.rand(1) * 1e4
+    physical_model = PhysicalModel(initial_mu=initial_mu,
+                                   initial_lambda=torch.tensor(1e4) * torch.rand(1),
                                    initial_velocity=torch.tensor([velocity[0], velocity[1], velocity[2]],
                                                                  dtype=torch.float32),
                                    initial_masses=model.particle_inv_mass + 0.1 * torch.rand_like(
@@ -151,7 +154,7 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
 
-        if e % training_config["logging_interval"] == 0 or e == epochs - 1:
+        if (e % training_config["logging_interval"] == 0 or e == epochs - 1) or loss < 2e-3:
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             losses.append(loss.item())
 
@@ -164,8 +167,8 @@ if __name__ == "__main__":
             print(f"Mu estimate: {estimated_mu}")
             print(f"Lambda estimate: {estimated_lambda}")
 
-            mu_loss = torch.log10(torch.abs(estimated_mu - gt_mu))
-            lambda_loss = torch.log10(torch.abs(estimated_lambda - gt_lambda))
+            mu_loss = torch.log10(estimated_mu) - torch.log10(gt_mu)
+            lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
 
             velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
@@ -178,6 +181,18 @@ if __name__ == "__main__":
                        "Lambda Abs Error Log10": lambda_loss,
                        "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference})
+
+        if loss < 0.00019:
+            # We converged.
+            break
+
+        for param_group in optimizer.param_groups:
+            if param_group["name"] == "lame":
+                grad = torch.abs(physical_model.mu_update.grad)
+                if grad < 1e-3:
+                    param_group["lr"] = 1
+                if grad < 1e-4:
+                    param_group["lr"] = 0
 
         optimizer.zero_grad()
 

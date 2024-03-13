@@ -62,7 +62,7 @@ def forward_pass(position, r, scale, velocity,
     if prediction_model:
         k_mu, k_lambda, velocity, masses = prediction_model()
         model.tet_materials[:, 0] = k_mu
-        model.tet_materials[:, 1] = k_lambda
+        # model.tet_materials[:, 1] = k_lambda
         # model.particle_v[:, ] = velocity
         # model.particle_inv_mass = masses
 
@@ -89,8 +89,8 @@ def forward_pass(position, r, scale, velocity,
 
 def initialize_optimizer(training_config: dict, model: PhysicalModel):
     param_groups = [
-        {'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]}#,
-        # {'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
-        # {'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
+        {'name': 'lame', 'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]},
+        {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
+        {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)

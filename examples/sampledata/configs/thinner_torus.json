@@ -16,10 +16,10 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gradsim_deformations/thinner_torus/positions_gt.npz",
     "exp_name": "thinner_torus",
     "frame_count": 25,
-    "epochs": 25,
+    "epochs": 300,
     "seed": 42,
     "lr": {
-      "lame": 5,
+      "lame": 50,
       "velocity": 0,
       "mass": 0
     },
