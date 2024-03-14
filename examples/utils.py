@@ -127,3 +127,7 @@ def get_ground_truth_lame(simulation_config: dict) -> (float, float):
         training_config = simulation_config["training"]
         return lame_from_young(training_config["E"], training_config["nu"])
     return simulation_config["mu"], simulation_config["lambda"]
+
+def save_positions(positions: torch.Tensor, filename: str) -> None:
+    positions_np = np.array([p.detach().cpu().numpy() for p in positions])
+    np.savez(filename, positions_np)

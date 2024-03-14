@@ -1,8 +1,8 @@
+import numpy as np
 import torch
 from tqdm import trange
 
 from gradsim import dflex as df
-from typing import List
 
 class PhysicalModel(torch.nn.Module):
     def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
@@ -62,8 +62,8 @@ def forward_pass(position, r, scale, velocity,
     if prediction_model:
         k_mu, k_lambda, velocity, masses = prediction_model()
         model.tet_materials[:, 0] = k_mu
-        # model.tet_materials[:, 1] = k_lambda
-        # model.particle_v[:, ] = velocity
+        model.tet_materials[:, 1] = k_lambda
+        model.particle_v[:, ] = velocity
         # model.particle_inv_mass = masses
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
@@ -89,8 +89,32 @@ def forward_pass(position, r, scale, velocity,
 
 def initialize_optimizer(training_config: dict, model: PhysicalModel):
     param_groups = [
-        {'name': 'lame', 'params': [model.mu_update, model.lambda_update], 'lr': training_config["lr"]["lame"]},
+        {'name': 'mu', 'params': [model.mu_update], 'lr': training_config["lr"]["mu"]},
+        {'name': 'lambda', 'params': [model.lambda_update], 'lr': training_config["lr"]["lambda"]},
         {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
         {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
+
+
+def load_gt_positions(training_config: dict):
+    r = eval(training_config["gt_rotation"])
+    path_to_gt = training_config["path_to_gt"]
+    positions_pseudo_gt = np.load(path_to_gt)["arr_0"]
+    edited_positions = []
+    if "transform_gt_points" in training_config:
+        for i in range(training_config["frame_count"]):
+            frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
+            rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
+            # frame_positions = sim_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
+            # TODO: MAKE CONTROL OF GT SCALE SEPARATE
+            frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
+            edited_positions.append(frame_positions)
+        positions_pseudo_gt = torch.stack(edited_positions)
+        # TODO: ALSO MAKE THIS NICER
+        # floor_level_offset = torch.zeros(3)
+        # floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
+        # positions_pseudo_gt -= floor_level_offset
+    else:
+        positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
+    return positions_pseudo_gt

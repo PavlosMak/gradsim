@@ -7,10 +7,10 @@ import numpy as np
 import torch
 
 import wandb
-from examples.training_utils import model_factory, forward_pass, initialize_optimizer, PhysicalModel
+from examples.training_utils import model_factory, forward_pass, initialize_optimizer, PhysicalModel, load_gt_positions
 
 from gradsim import dflex as df
-from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh
+from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh, save_positions
 
 from scipy.spatial import KDTree
 
@@ -52,28 +52,10 @@ if __name__ == "__main__":
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
-    r = eval(training_config["gt_rotation"])
     r2 = eval(training_config["sim_mesh_rotation"])
     sim_scale = training_config["sim_scale"]
 
-    path_to_gt = training_config["path_to_gt"]
-    positions_pseudo_gt = np.load(path_to_gt)["arr_0"]
-    edited_positions = []
-    if "transform_gt_points" in training_config:
-        for i in range(training_frame_count):
-            frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
-            rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
-            # frame_positions = sim_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
-            # TODO: MAKE CONTROL OF GT SCALE SEPARATE
-            frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
-            edited_positions.append(frame_positions)
-        positions_pseudo_gt = torch.stack(edited_positions)
-        # TODO: ALSO MAKE THIS NICER
-        # floor_level_offset = torch.zeros(3)
-        # floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
-        # positions_pseudo_gt -= floor_level_offset
-    else:
-        positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
+    positions_pseudo_gt = load_gt_positions(training_config)
 
     full_frame_count = training_config["eval_for"]
     eval_sim_duration = full_frame_count / simulation_config["physics_engine_rate"]
@@ -112,13 +94,13 @@ if __name__ == "__main__":
 
     # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
     initial_mu = torch.rand(1) * 1e4
+    initial_lambda = torch.rand(1) * 1e4
     physical_model = PhysicalModel(initial_mu=initial_mu,
-                                   initial_lambda=torch.tensor(1e4) * torch.rand(1),
-                                   initial_velocity=torch.tensor([velocity[0], velocity[1], velocity[2]],
-                                                                 dtype=torch.float32),
+                                   initial_lambda=initial_lambda,
+                                   initial_velocity=initial_velocity_estimate,
                                    initial_masses=model.particle_inv_mass + 0.1 * torch.rand_like(
                                        model.particle_inv_mass),
-                                   update_scale_velocity=0.0, update_scale_lame=10, update_scale_masses=0)
+                                   update_scale_velocity=1.0, update_scale_lame=10, update_scale_masses=0)
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
@@ -132,8 +114,8 @@ if __name__ == "__main__":
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
                                                       sim_dt, render_steps, physical_model)
-    positions_np = np.array([p.detach().cpu().numpy() for p in unoptimized_positions])
-    np.savez(os.path.join(output_directory, "unoptimized.npz"), positions_np)
+
+    save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
     epochs = training_config["epochs"]
     losses = []
@@ -168,7 +150,9 @@ if __name__ == "__main__":
             print(f"Lambda estimate: {estimated_lambda}")
 
             mu_loss = torch.log10(estimated_mu) - torch.log10(gt_mu)
+            mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu)
             lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
+            lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
 
             velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
@@ -176,29 +160,35 @@ if __name__ == "__main__":
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
                        "Mu Abs Error Log10": mu_loss,
+                       "Mu Relative Error": mu_mape,
                        "Mu Grad": physical_model.mu_update.grad,
                        "Lambda": estimated_lambda,
                        "Lambda Abs Error Log10": lambda_loss,
+                       "Lambda Relative Error": lambda_mape,
                        "Lambda Grad": physical_model.lambda_update.grad,
-                       "Velocity Estimate Difference": velocity_estimate_difference})
+                       "Velocity Estimate Difference": velocity_estimate_difference,
+                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item()})
 
-        if loss < 0.00019:
+        if loss < 0.0002:
             # We converged.
             break
 
         for param_group in optimizer.param_groups:
-            if param_group["name"] == "lame":
-                grad = torch.abs(physical_model.mu_update.grad)
-                if grad < 1e-3:
-                    param_group["lr"] = 1
-                if grad < 1e-4:
-                    param_group["lr"] = 0
+            if e == 25 and param_group['name'] == "velocity":
+                param_group['lr'] = 0.01
+            grad = param_group['params'][0].grad
+            if grad is None:
+                continue
+            grad_magnitude = torch.linalg.norm(grad)
+            if grad_magnitude < 1e-4:
+                param_group["lr"] = 0
+            if grad_magnitude < 1e-3:
+                param_group["lr"] = 1
 
         optimizer.zero_grad()
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
-    positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-    np.savez(os.path.join(output_directory, f"predicted.npz"), positions_np)
+    save_positions(positions, f"{output_directory}/predicted.npz")
 
     # Save models
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
@@ -208,8 +198,7 @@ if __name__ == "__main__":
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model)
-    positions_np = np.array([p.detach().cpu().numpy() for p in positions])
-    np.savez(f"{output_directory}/eval.npz", positions_np)
+    save_positions(positions, f"{output_directory}/eval.npz")
 
     # Log loss landscapes
     wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
