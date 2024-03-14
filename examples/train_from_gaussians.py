@@ -126,8 +126,8 @@ if __name__ == "__main__":
 
     positions_pseudo_gt = []
     pseudo_gt_ground_level = torch.inf
-    for i in range(training_frame_count):
-        frame_gt_path = f"{path_to_gt}/gt_{i}.txt"
+    for progress_counter in range(training_frame_count):
+        frame_gt_path = f"{path_to_gt}/gt_{progress_counter}.txt"
         frame_positions = torch.tensor(np.loadtxt(frame_gt_path, delimiter="\t"), dtype=torch.float32)
         rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
         frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)

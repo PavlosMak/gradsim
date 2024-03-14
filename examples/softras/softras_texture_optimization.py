@@ -93,14 +93,14 @@ if __name__ == "__main__":
     # Perform texture optimization.
     if not args.no_viz:
         writer = imageio.get_writer(progressfile, mode="I")
-    for i in trange(args.iters):
+    for progress_counter in trange(args.iters):
         optimizer.zero_grad()
         textures = model()
         rgba = renderer.forward(vertices, faces, textures)
         loss = mseloss(rgba, img_target)
         loss.backward()
         optimizer.step()
-        if i % 5 == 0:
+        if progress_counter % 5 == 0:
             # TODO: Add functionality to write to gif output file.
             tqdm.write(f"Loss: {loss.item():.5}")
             if not args.no_viz:

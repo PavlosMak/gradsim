@@ -233,7 +233,7 @@ if __name__ == "__main__":
         # states_gt = []
         imgs_gt = []
         positions_gt = []
-        for i in trange(0, sim_steps):
+        for progress_counter in trange(0, sim_steps):
             # phases = torch.zeros(phase_count)
             # for p in range(phase_count):
             #     phases[p] = math.sin(phase_freq * (sim_time + p * phase_step))
@@ -243,7 +243,7 @@ if __name__ == "__main__":
             state_gt = integrator.forward(model_gt, state_gt, sim_dt)
             sim_time += sim_dt
 
-            if i % render_steps == 0:
+            if progress_counter % render_steps == 0:
                 rgba = renderer.forward(
                     state_gt.q.unsqueeze(0).to(device),
                     faces.unsqueeze(0).to(device),
@@ -371,7 +371,7 @@ if __name__ == "__main__":
             losses = []
             inv_mass_errors = []
             mass_errors = []
-            for i in trange(0, sim_steps):
+            for progress_counter in trange(0, sim_steps):
                 # phases = torch.zeros(phase_count)
                 # for p in range(phase_count):
                 #     phases[p] = math.sin(phase_freq * (sim_time + p * phase_step))
@@ -381,7 +381,7 @@ if __name__ == "__main__":
                 state = integrator.forward(model, state, sim_dt)
                 sim_time += sim_dt
 
-                if i % render_steps == 0:
+                if progress_counter % render_steps == 0:
                     rgba = renderer.forward(
                         state.q.unsqueeze(0).to(device),
                         faces.unsqueeze(0).to(device),

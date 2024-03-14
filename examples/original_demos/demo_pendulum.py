@@ -164,8 +164,8 @@ if __name__ == "__main__":
 
     imgs_gt = []
     print("Rendering GT images...")
-    for i in trange(numsteps):
-        _vertices = vertices_gt.clone() + pos_gt[i]
+    for progress_counter in trange(numsteps):
+        _vertices = vertices_gt.clone() + pos_gt[progress_counter]
         rgba = renderer.forward(_vertices, faces_gt, textures)
         imgs_gt.append(rgba)
 
@@ -218,8 +218,8 @@ if __name__ == "__main__":
         z = torch.zeros_like(x)
         pos = torch.stack((x, y, z), dim=-1)
         imgs_est = []
-        for i in range(numsteps):
-            _vertices = vertices_gt.clone() + pos[i]
+        for progress_counter in range(numsteps):
+            _vertices = vertices_gt.clone() + pos[progress_counter]
             rgba = renderer.forward(_vertices, faces_gt, textures)
             imgs_est.append(rgba)
         loss = sum(

@@ -92,14 +92,14 @@ if __name__ == "__main__":
     # Perform vertex optimization.
     if not args.no_viz:
         writer = imageio.get_writer(progressfile, mode="I")
-    for i in trange(args.iters):
+    for progress_counter in trange(args.iters):
         optimizer.zero_grad()
         new_vertices = model()
         rgba = renderer.forward(new_vertices, faces, textures)
         loss = mseloss(rgba, img_target)
         loss.backward()
         optimizer.step()
-        if i % 20 == 0:
+        if progress_counter % 20 == 0:
             # TODO: Add functionality to write to gif output file.
             tqdm.write(f"Loss: {loss.item():.5}")
             if not args.no_viz:

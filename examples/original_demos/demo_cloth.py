@@ -150,14 +150,14 @@ if __name__ == "__main__":
 
         # run simulation
         imgs_gt = []
-        for i in trange(0, sim_steps):
+        for progress_counter in trange(0, sim_steps):
             state = integrator.forward(model, state, sim_dt)
             sim_time += sim_dt
 
             com_pos = torch.mean(state.q, 0)
             com_vel = torch.mean(state.u, 0)
 
-            if i % render_steps == 0:
+            if progress_counter % render_steps == 0:
                 # rgb, alpha, _ = renderer(
                 #     points=[state.q.unsqueeze(0).to(device), faces.long()],
                 #     colors_bxpx3=torch.ones(1, state.q.shape[-2], 3).float().cuda(),
@@ -281,14 +281,14 @@ if __name__ == "__main__":
 
         # run simulation
         imgs = []
-        for i in trange(0, sim_steps):
+        for progress_counter in trange(0, sim_steps):
             state = integrator.forward(model, state, sim_dt)
             sim_time += sim_dt
 
             com_pos = torch.mean(state.q, 0)
             com_vel = torch.mean(state.u, 0)
 
-            if i % render_steps == 0:
+            if progress_counter % render_steps == 0:
                 rgba = renderer.forward(
                     state.q.unsqueeze(0).to(device),
                     faces.unsqueeze(0).to(device),

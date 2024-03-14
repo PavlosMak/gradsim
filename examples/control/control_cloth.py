@@ -250,11 +250,11 @@ if __name__ == "__main__":
             imgs = []
 
             # run simulation
-            for i in range(0, sim_steps):
+            for progress_counter in range(0, sim_steps):
 
                 state = integrator.forward(model, state, sim_dt)
 
-                if i % render_every == 0 or i == sim_steps - 1:
+                if progress_counter % render_every == 0 or progress_counter == sim_steps - 1:
                     # with torch.no_grad():
                     device = "cuda:0"
                     rgba = renderer.forward(
@@ -271,7 +271,7 @@ if __name__ == "__main__":
                 com_vel = torch.mean(state.u, 0)
 
                 # use integral of velocity over course of the run
-                if i % render_every == 0 or i == sim_steps - 1:
+                if progress_counter % render_every == 0 or progress_counter == sim_steps - 1:
                     # To ensure fairness: both methods get loss at same timesteps.
                     if args.method == "physics-only":
                         loss = loss + torch.nn.functional.mse_loss(com_pos, target_position)

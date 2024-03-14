@@ -149,7 +149,7 @@ if __name__ == "__main__":
 
     # Run the simulation.
     # writer = imageio.get_writer(outfile, mode="I")
-    for i in trange(args.simsteps):
+    for progress_counter in trange(args.simsteps):
         sim_gt.step()
         # print("Body is at:", body.position)
         rgba = renderer.forward(
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     est_masses = None
     initial_imgs = []
     initial_masses = None
-    for i in trange(args.epochs):
+    for progress_counter in trange(args.epochs):
         masses_cur = model()
         body = RigidBody(vertices[0], masses=masses_cur)
         body.add_external_force(gravity, application_points=[0, 1])
@@ -185,7 +185,7 @@ if __name__ == "__main__":
                 body.get_world_vertices().unsqueeze(0), faces, textures
             )
             img_est.append(rgba)
-            if i == 0:
+            if progress_counter == 0:
                 initial_imgs.append(rgba)  # To log initial guess.
         loss = sum(
             [
@@ -205,7 +205,7 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
-        if i == 40 or i == 80:
+        if progress_counter == 40 or progress_counter == 80:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = param_group["lr"] * 0.5
 

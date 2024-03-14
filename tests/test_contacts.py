@@ -47,9 +47,9 @@ if __name__ == "__main__":
     print(cube.position)
     print("vertices at start:", cube.get_world_vertices())
 
-    for i in range(800):
+    for progress_counter in range(800):
         sim.step()
-        if i % sim_substeps == 0:
+        if progress_counter % sim_substeps == 0:
             print(cube.position)
 
     #     print("vertices")

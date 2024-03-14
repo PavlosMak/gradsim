@@ -53,11 +53,11 @@ if __name__ == "__main__":
     face_materials = [-1] * len(counts)
     face_subsets = UsdGeom.Subset.GetAllGeomSubsets(geom)
 
-    for i, s in enumerate(face_subsets):
+    for progress_counter, s in enumerate(face_subsets):
         face_subset_indices = s.GetIndicesAttr().Get()
 
         for f in face_subset_indices:
-            face_materials[f] = i
+            face_materials[f] = progress_counter
 
     active_material = 0
     active_scale = []
@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
         imgs = []
 
-        for i in range(0, sim_steps):
+        for progress_counter in range(0, sim_steps):
 
             # build sinusoidal input phases
             phases = torch.zeros(phase_count)
@@ -193,7 +193,7 @@ if __name__ == "__main__":
 
             loss = loss - com_loss[1] - act_loss
 
-            if i % render_every == 0 or i == sim_steps - 1:
+            if progress_counter % render_every == 0 or progress_counter == sim_steps - 1:
                 with torch.no_grad():
                     device = "cuda:0"
                     rgba = renderer.forward(

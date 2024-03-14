@@ -192,11 +192,11 @@ if __name__ == "__main__":
     imgs1_gt = []
     imgs2_gt = []
     print("Rendering GT images...")
-    for i in trange(numsteps):
-        _vertices = vertices_gt.clone() + pos1_gt[i]
+    for progress_counter in trange(numsteps):
+        _vertices = vertices_gt.clone() + pos1_gt[progress_counter]
         rgba1 = renderer.forward(_vertices, faces, textures_red)
         imgs1_gt.append(rgba1)
-        _vertices = vertices_gt.clone() + pos2_gt[i]
+        _vertices = vertices_gt.clone() + pos2_gt[progress_counter]
         rgba2 = renderer.forward(_vertices, faces, textures_blue)
         imgs2_gt.append(rgba2)
 
@@ -244,11 +244,11 @@ if __name__ == "__main__":
 
         imgs1_est = []
         imgs2_est = []
-        for i in range(numsteps):
-            _vertices = vertices_gt.clone() + pos1[i]
+        for progress_counter in range(numsteps):
+            _vertices = vertices_gt.clone() + pos1[progress_counter]
             rgba1 = renderer.forward(_vertices, faces, textures_red)
             imgs1_est.append(rgba1)
-            _vertices = vertices_gt.clone() + pos2[i]
+            _vertices = vertices_gt.clone() + pos2[progress_counter]
             rgba2 = renderer.forward(_vertices, faces, textures_blue)
             imgs2_est.append(rgba2)
 

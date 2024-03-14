@@ -289,7 +289,7 @@ if __name__ == "__main__":
         est_restitution = None
         initial_imgs = []
         initial_masses = None
-        for i in trange(args.optiters):
+        for progress_counter in trange(args.optiters):
             masses_cur = massmodel()
             restitution_cur = restitutionmodel()
             # print(masses_cur.mean())
@@ -339,7 +339,7 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            if i == 40 or i == 80:
+            if progress_counter == 40 or progress_counter == 80:
                 for param_group in optimizer.param_groups:
                     param_group["lr"] = param_group["lr"] * 0.5
 

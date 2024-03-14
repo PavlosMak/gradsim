@@ -147,10 +147,10 @@ if __name__ == "__main__":
     # outfile = "cache/a.gif"
     # writer = imageio.get_writer(outfile, mode="I")
     imgs_gt = []
-    for i in trange(sim_steps):
+    for progress_counter in trange(sim_steps):
         sim_gt.step()
         # print("Body is at:", body.position)
-        if i % render_every == 0:
+        if progress_counter % render_every == 0:
             rgba = renderer.forward(
                 body.get_world_vertices().unsqueeze(0), faces, textures
             )
@@ -170,10 +170,10 @@ if __name__ == "__main__":
     mass_interp = torch.linspace(0.1, 5, 50, dtype=vertices.dtype, device=device)
     e_interp = torch.linspace(0.4, 1.0, 10, dtype=vertices.dtype, device=device)
 
-    for i in trange(mass_interp.numel()):
+    for progress_counter in trange(mass_interp.numel()):
         for j in trange(e_interp.numel()):
             masses_cur = torch.nn.Parameter(
-                mass_interp[i]
+                mass_interp[progress_counter]
                 * torch.ones(vertices.shape[1], dtype=vertices.dtype, device=device),
                 requires_grad=False,
             )
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             imgs_est = []
             for t in range(sim_steps):
                 sim_est.step()
-                if i % render_every == 0:
+                if progress_counter % render_every == 0:
                     rgba = renderer.forward(
                         body.get_world_vertices().unsqueeze(0), faces, textures
                     )
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                 ]
             ) / (len(imgs_est[:: args.compare_every]))
 
-            mass_estimates.append(mass_interp[i].item())
+            mass_estimates.append(mass_interp[progress_counter].item())
             mass_errors.append((masses_cur - masses_gt).abs().mean().item())
             restitution_estimates.append(e_cur)
             restitution_errors.append(abs(restitution_gt - e_cur))

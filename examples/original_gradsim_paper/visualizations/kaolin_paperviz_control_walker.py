@@ -129,11 +129,11 @@ if __name__ == "__main__":
         builder.add_particle(tuple(p), (0.0, 0.0, 0.0), 1.0)
 
     for t in range(0, len(indices), 3):
-        i = indices[t + 0]
+        progress_counter = indices[t + 0]
         j = indices[t + 1]
         k = indices[t + 2]
 
-        builder.add_triangle(i, j, k)
+        builder.add_triangle(progress_counter, j, k)
 
     model = builder.finalize("cpu")
     # model.tri_lambda = 10000.0
@@ -209,7 +209,7 @@ if __name__ == "__main__":
         imgs = []
         vertices = []
 
-        for i in range(0, sim_steps):
+        for progress_counter in range(0, sim_steps):
 
             # build sinusoidal phase inputs
             phases = torch.zeros(phase_count)
@@ -224,7 +224,7 @@ if __name__ == "__main__":
             # if (render and (i%sim_substeps == 0)):
             #     render_time += sim_dt*sim_substeps
             # renderer.update(state, render_time)
-            if i % render_every == 0 or i == sim_steps - 1:
+            if progress_counter % render_every == 0 or progress_counter == sim_steps - 1:
                 # with torch.no_grad():
                 device = "cuda:0"
                 rgba = renderer.forward(
@@ -236,7 +236,7 @@ if __name__ == "__main__":
                 vertices.append(state.q.detach().cpu().numpy())
 
                 timelapse.add_mesh_batch(
-                    iteration=e*sim_steps + i,
+                    iteration=e * sim_steps + progress_counter,
                     category="predicted_mesh",
                     vertices_list=[state.q.unsqueeze(0).cpu()],
                     faces_list=faces.unsqueeze(0).cpu(),

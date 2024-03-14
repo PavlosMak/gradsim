@@ -14,9 +14,9 @@ if __name__ == "__main__":
     # Add an anchor point (set mass to zero).
     builder.add_particle((0, 1.0, 0.0), (0.0, 0.0, 0.0), 0.0)
     # Build a chain (a spring-mass system).
-    for i in range(1, 10):
-        builder.add_particle((i, 1.0, 0.0), (0.0, 0.0, 0.0), 1.0)
-        builder.add_spring(i - 1, i, 1.0e3, 0.0, 0)
+    for progress_counter in range(1, 10):
+        builder.add_particle((progress_counter, 1.0, 0.0), (0.0, 0.0, 0.0), 1.0)
+        builder.add_spring(progress_counter - 1, progress_counter, 1.0e3, 0.0, 0)
     # Add a ground plane.
     builder.ground = True
     # Convert to a PyTorch simulation data structure.
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     state = model.state()
 
     # Run (differentiable) simulation
-    for i in trange(sim_steps):
+    for progress_counter in trange(sim_steps):
         state = integrator.forward(model, state, sim_dt)
     print("Positions:", state.q)
     print("Velocities:", state.u)

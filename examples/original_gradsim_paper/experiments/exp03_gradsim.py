@@ -380,7 +380,7 @@ if __name__ == "__main__":
     # Run the simulation.
     with torch.no_grad():
         # writer = imageio.get_writer(outfile, mode="I")
-        for i in trange(args.simsteps):
+        for progress_counter in trange(args.simsteps):
             sim_gt.step()
             # print("Body is at:", body.position)
             img_gt, alpha_gt, _ = renderer.forward(
@@ -550,7 +550,7 @@ if __name__ == "__main__":
         param.requires_grad = False
 
     # frame_of_interest = 0
-    for i in trange(args.shapeepochs):
+    for progress_counter in trange(args.shapeepochs):
         masses_cur = torch.ones_like(masses_est)  # massmodel()
         vertices_cur = shapemodel()
         body = RigidBody(
@@ -581,7 +581,7 @@ if __name__ == "__main__":
             # )
             imgs_est.append(rgba)
             vertices_est.append(body.get_world_vertices().detach().cpu().numpy())
-            if i == 0:
+            if progress_counter == 0:
                 initial_imgs.append(rgba)  # To log initial guess.
 
         mseloss = sum(
@@ -606,14 +606,14 @@ if __name__ == "__main__":
 
         vertices_prev = vertices_cur
 
-        if args.log and i % args.log_every == 0:
+        if args.log and progress_counter % args.log_every == 0:
             write_imglist_to_gif(
-                imgs_est, os.path.join(logdir, f"shape_{i:05d}.gif"), imgformat="dibr"
+                imgs_est, os.path.join(logdir, f"shape_{progress_counter:05d}.gif"), imgformat="dibr"
             )
             write_meshes_to_dir(
                 vertices_est,
                 faces[0].detach().cpu().numpy(),
-                os.path.join(logdir, f"vertices_{i:05d}"),
+                os.path.join(logdir, f"vertices_{progress_counter:05d}"),
             )
 
 

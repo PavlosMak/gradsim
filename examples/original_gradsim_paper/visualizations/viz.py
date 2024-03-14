@@ -78,7 +78,7 @@ if __name__ == "__main__":
     os.makedirs(args.out_dir, exist_ok=True)
 
     # The last file in each dir is `faces.txt`. Ignore it.
-    for i, gt_file in tqdm(enumerate(gt_files[:args.T]), total=len(gt_files[:args.T])):
+    for progress_counter, gt_file in tqdm(enumerate(gt_files[:args.T]), total=len(gt_files[:args.T])):
         # print(gt_file)
         vertices = np.loadtxt(gt_file)  # .float().to(device)
         # print(vertices.mean())
@@ -104,7 +104,7 @@ if __name__ == "__main__":
         img = (rgbd*255).astype(np.uint8)
         # vis.capture_screen_image(os.path.join(out_gt_dir, f"{i:03d}.png"), do_render=True)
         vis.destroy_window()
-        imageio.imwrite(os.path.join(args.out_dir, f"{i:03d}.png"), img)
+        imageio.imwrite(os.path.join(args.out_dir, f"{progress_counter:03d}.png"), img)
 
     # Blend
     im_name = os.path.realpath(os.path.join(args.out_dir, "../../../", os.path.basename(args.out_dir.strip('/')) + f"_f{args.freq}_blend.png"))

@@ -289,7 +289,7 @@ if __name__ == "__main__":
             imgs = []
             vertices = []
 
-            for i in trange(0, sim_steps):
+            for progress_counter in trange(0, sim_steps):
 
                 phases = torch.zeros(phase_count)
                 for p in range(phase_count):
@@ -305,7 +305,7 @@ if __name__ == "__main__":
                 state = integrator.forward(model, state, sim_dt)
                 sim_time += sim_dt
 
-                if i % render_every == 0:
+                if progress_counter % render_every == 0:
                     # with torch.no_grad():
                     device = "cuda:0"
                     rgba = renderer.forward(

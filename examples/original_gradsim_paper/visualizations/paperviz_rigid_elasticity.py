@@ -203,7 +203,7 @@ if __name__ == "__main__":
         # construct contacts once at startup
         model_gt.collide(state_gt)
 
-        for i in trange(sim_steps):
+        for progress_counter in trange(sim_steps):
 
             # forward dynamics
             state_gt = integrator.forward(
@@ -212,7 +212,7 @@ if __name__ == "__main__":
             sim_time += sim_dt
 
             # render
-            if i % render_every == 0 or i == sim_steps - 1:
+            if progress_counter % render_every == 0 or progress_counter == sim_steps - 1:
                 # with torch.no_grad():
                 device = "cuda:0"
                 # print(i, state.rigid_x, state.rigid_r, faces.unsqueeze(0).shape, textures.shape)

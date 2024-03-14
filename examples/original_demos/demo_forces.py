@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     # Run the simulation.
     writer = imageio.get_writer(outfile, mode="I")
-    for i in trange(20):
+    for progress_counter in trange(20):
         sim.step()
         # print("Body is at:", body.position)
         rgba = renderer.forward(body.get_world_vertices().unsqueeze(0), faces, textures)

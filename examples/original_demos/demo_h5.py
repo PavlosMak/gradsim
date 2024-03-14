@@ -358,7 +358,7 @@ if __name__ == "__main__":
     pos, ornt, linvel, angvel = None, None, None, None
 
     try:
-        for i in trange(args.n):
+        for progress_counter in trange(args.n):
 
             volume = 0.0
             while volume < args.volume_thresh:
@@ -456,8 +456,8 @@ if __name__ == "__main__":
 
             if args.debug:
                 print(sample.__dict__, init_pos[0] if args.record_trajectory else init_pos)
-                imageio.mimwrite(os.path.join(args.debugdir, f"{i:02d}.gif"), sequence)
-                if i > args.debug_num:
+                imageio.mimwrite(os.path.join(args.debugdir, f"{progress_counter:02d}.gif"), sequence)
+                if progress_counter > args.debug_num:
                     sys.exit()
 
             else:

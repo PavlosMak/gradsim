@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     # Run the simulation.
     # writer = imageio.get_writer(outfile, mode="I")
-    for i in trange(args.simsteps):
+    for progress_counter in trange(args.simsteps):
         sim_gt.step()
         # print("Body is at:", body.position)
         rgba = renderer.forward(
@@ -173,9 +173,9 @@ if __name__ == "__main__":
 
     mass_interp = torch.linspace(0.1, 5, 500, dtype=vertices.dtype, device=device)
 
-    for i in trange(mass_interp.numel()):
+    for progress_counter in trange(mass_interp.numel()):
         masses_cur = torch.nn.Parameter(
-            mass_interp[i]
+            mass_interp[progress_counter]
             * torch.ones(vertices.shape[1], dtype=vertices.dtype, device=device),
             requires_grad=False,
         )
@@ -189,7 +189,7 @@ if __name__ == "__main__":
                 body.get_world_vertices().unsqueeze(0), faces, textures
             )
             img_est.append(rgba)
-            if i == 0:
+            if progress_counter == 0:
                 initial_imgs.append(rgba)  # To log initial guess.
         loss = sum(
             [
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         #     f"Mass (err): {(masses_cur - masses_gt).abs().mean():.5f}"
         # )
 
-        mass_estimates.append(mass_interp[i].item())
+        mass_estimates.append(mass_interp[progress_counter].item())
         mass_errors.append((masses_cur - masses_gt).abs().mean().item())
         losses.append(loss.item())
 
