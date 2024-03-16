@@ -13,7 +13,7 @@ from examples.training_utils import load_gt_positions, forward_pass
 
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
-path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus.json"
+path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/fearless_microwave.json"
 
 with open(path_to_config) as config_file:
     simulation_config = json.load(config_file)
@@ -34,7 +34,7 @@ k_damp = simulation_config["damp"]
 
 r2 = eval(training_config["sim_mesh_rotation"])
 sim_scale = training_config["sim_scale"]
-sim_scale = 1.0
+# sim_scale = 1.0
 
 points, tet_indices = load_mesh(training_config["training_mesh"])
 points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
@@ -54,23 +54,8 @@ progress_counter = 0
 # mass_noise = torch.rand(592)
 mass_noise = None
 
+
 def get_loss(x, y) -> float:
-    global progress_counter
-    print(f"{progress_counter}/{total_iterations}")
-    progress_counter += 1
-    k_mu = x
-    k_lambda = y
-    with torch.no_grad():
-        positions, _, _, _ = forward_pass(position, df.quat_identity(),
-                                          scale, velocity, points, tet_indices, density,
-                                          k_mu, k_lambda, k_damp, training_sim_steps,
-                                          sim_dt, render_steps)
-        save_positions(positions, f"{output_dir}/positions_pred.npz")
-        loss = mse(positions, positions_pseudo_gt[:training_frame_count])
-    return loss.item()
-
-
-def get_loss_weighted(x, y) -> float:
     global progress_counter
     print(f"{progress_counter}/{total_iterations}")
     progress_counter += 1
@@ -82,63 +67,17 @@ def get_loss_weighted(x, y) -> float:
                                               k_mu, k_lambda, k_damp, training_sim_steps,
                                               sim_dt, render_steps, mass_noise=mass_noise)
         save_positions(positions, f"{output_dir}/positions_pred.npz")
-        weights = torch.zeros(training_frame_count)
-        weights[12:16] = 1
-        loss = (weights * torch.sum(torch.mean(200 * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
+        weights = torch.ones(training_frame_count)
+        C = 1
+        # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
+        loss = torch.zeros(1)
     return loss.item()
 
 
-vectorized_lame = np.vectorize(get_loss)
-vectorized_weighted = np.vectorize(get_loss_weighted)
+vectorized_loss = np.vectorize(get_loss)
 
 
-def plot_mu_loss_landscape(load=False):
-    steps = 100
-    center = 1e4
-    radius = 3500
-
-    low_bound = center - radius
-    high_bound = center + radius
-
-    xs = torch.linspace(low_bound, high_bound, steps=steps)
-    ys = torch.ones_like(xs) * 1e4
-
-    if not load:
-        zs = vectorized_lame(xs, ys)
-        np.savez(f"{output_dir}/mu_loss_landscape.npz", zs)
-    else:
-        zs = np.load(f"{output_dir}/mu_loss_landscape.npz")["arr_0"]
-
-    plt.plot(xs, zs)
-    plt.xlabel("$\mu$")
-    plt.ylabel("Loss")
-    plt.show()
-
-
-def plot_lambda_loss_landscape(load=False):
-    steps = 100
-    center = 1e4
-    radius = 3500
-
-    low_bound = center - radius
-    high_bound = center + radius
-
-    xs = torch.linspace(low_bound, high_bound, steps=steps)
-    ys = torch.ones_like(xs) * 1e4
-
-    if not load:
-        zs = vectorized_lame(ys, xs)
-        np.savez(f"{output_dir}/lambda_loss_landscape.npz", zs)
-    else:
-        zs = np.load(f"{output_dir}/lambda_loss_landscape.npz")["arr_0"]
-
-    plt.plot(xs, zs)
-    plt.xlabel("$\lambda$")
-    plt.ylabel("Loss")
-    plt.show()
-
-
-def plot_joined_loss_landscape(output_filename, function=vectorized_lame, load=False, steps=100, center=1e4,
+def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=False, steps=100, center=1e4,
                                radius=3500):
     low_bound = center - radius
     high_bound = center + radius
@@ -169,5 +108,5 @@ def plot_joined_loss_landscape(output_filename, function=vectorized_lame, load=F
 if __name__ == '__main__':
     loss = get_loss(1e4, 1e4)
     print(f"Loss at known optimum: {loss}")
-    output_filename = f"{output_dir}/joined_loss_landscape_12-16_times200.npz"
-    plot_joined_loss_landscape(output_filename, load=False, steps=10, function=vectorized_weighted)
+    output_filename = f"{output_dir}/fearless_temp.npz"
+    plot_joined_loss_landscape(output_filename, load=False, steps=2)

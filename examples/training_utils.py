@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from tqdm import trange
 
+import math
 from gradsim import dflex as df
 
 
@@ -57,8 +58,11 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
-                 prediction_model=None):
+                 prediction_model=None, mass_noise=None):
     model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
+
+    if mass_noise is not None:
+        model.particle_inv_mass = model.particle_inv_mass + model.particle_inv_mass * mass_noise
 
     if prediction_model:
         k_mu, k_lambda, velocity, masses = prediction_model()
@@ -104,18 +108,29 @@ def load_gt_positions(training_config: dict):
     positions_pseudo_gt = np.load(path_to_gt)["arr_0"]
     edited_positions = []
     if "transform_gt_points" in training_config:
+        gt_scale = training_config["gt_scale"]
         for i in range(training_config["frame_count"]):
             frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
             rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
-            # frame_positions = sim_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
-            # TODO: MAKE CONTROL OF GT SCALE SEPARATE
-            frame_positions = (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
+            frame_positions = gt_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
             edited_positions.append(frame_positions)
         positions_pseudo_gt = torch.stack(edited_positions)
-        # TODO: ALSO MAKE THIS NICER
-        # floor_level_offset = torch.zeros(3)
-        # floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
-        # positions_pseudo_gt -= floor_level_offset
+        if "offset_floor" in training_config:
+            floor_level_offset = torch.zeros(3)
+            floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
+            positions_pseudo_gt -= floor_level_offset
     else:
         positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
     return positions_pseudo_gt
+
+
+def lossfn(predicted_positions, gt_positions, index_map):
+    total_loss = torch.zeros(1)
+    frames = predicted_positions.shape[0]
+    for frame in range(frames):
+        loss = torch.zeros(1)
+        for pi in index_map:
+            ni, dist = index_map[pi]
+            loss += (torch.linalg.norm(predicted_positions[frame][pi] - gt_positions[frame][ni]) - dist) ** 2
+        total_loss += (loss / len(index_map))
+    return total_loss / frames

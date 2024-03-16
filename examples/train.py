@@ -7,10 +7,9 @@ import numpy as np
 import torch
 
 import wandb
-from examples.training_utils import model_factory, forward_pass, initialize_optimizer, PhysicalModel, load_gt_positions
-
+from examples.training_utils import *
 from gradsim import dflex as df
-from utils import load_mesh, lossfn, get_ground_truth_lame, load_pseudo_gt_mesh, save_positions
+from utils import *
 
 from scipy.spatial import KDTree
 
@@ -135,9 +134,11 @@ if __name__ == "__main__":
         if "loss_start_frame" in training_config and "loss_end_frame" in training_config:
             start = training_config["loss_start_frame"]
             end = training_config["loss_end_frame"]
+            # TODO Add lossfn here as well
             loss = training_frame_count * mse(positions[start:end], positions_pseudo_gt[start:end])
         else:
-            loss = mse(positions, positions_pseudo_gt[:training_frame_count])
+            loss = lossfn(positions, positions_pseudo_gt, index_map)
+            # loss = mse(positions, positions_pseudo_gt[:training_frame_count])
 
         loss.backward()
         optimizer.step()

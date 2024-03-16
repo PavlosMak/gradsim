@@ -30,6 +30,7 @@
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 7,
+    "gt_scale": 1,
     "training_mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/thinner_torus/torus.obj",
     "eval_for": 40,
     "gt_rotation": "df.quat_identity()",
