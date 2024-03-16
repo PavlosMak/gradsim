@@ -4,6 +4,7 @@ from tqdm import trange
 
 from gradsim import dflex as df
 
+
 class PhysicalModel(torch.nn.Module):
     def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
                  update_scale_velocity=0.1, update_scale_masses=0.1):
