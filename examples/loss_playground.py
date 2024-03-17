@@ -4,12 +4,15 @@ import torch
 import json
 import math
 
-from utils import lame_from_young
+from torch.nn import MSELoss
 
 from examples.utils import load_mesh, save_positions
 from gradsim import dflex as df
 
 from examples.training_utils import load_gt_positions, forward_pass
+from examples.losses import *
+
+from pytorch3d.loss import chamfer_distance
 
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
@@ -34,7 +37,6 @@ k_damp = simulation_config["damp"]
 
 r2 = eval(training_config["sim_mesh_rotation"])
 sim_scale = training_config["sim_scale"]
-# sim_scale = 1.0
 
 points, tet_indices = load_mesh(training_config["training_mesh"])
 points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
@@ -47,6 +49,8 @@ training_sim_steps = int(training_sim_duration / sim_dt)
 render_steps = simulation_config["sim_substeps"]
 
 mse = torch.nn.MSELoss(reduction="sum")
+fixedcorrloss = FixedCorrespondenceDistanceLoss(positions_pseudo_gt[0], points)
+msecorrloss = MSECorrespondencesLoss(positions_pseudo_gt[0], points)
 
 total_iterations = 0
 progress_counter = 0
@@ -70,23 +74,25 @@ def get_loss(x, y) -> float:
         weights = torch.ones(training_frame_count)
         C = 1
         # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
-        loss = torch.zeros(1)
+        # loss = torch.zeros(1)
+        # loss = lossfn(positions, positions_pseudo_gt)
+        loss = chamfer_distance(positions, positions_pseudo_gt)[0]
+        # loss = msecorrloss(positions, positions_pseudo_gt)
     return loss.item()
 
 
 vectorized_loss = np.vectorize(get_loss)
 
 
-def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=False, steps=100, center=1e4,
-                               radius=3500):
-    low_bound = center - radius
-    high_bound = center + radius
-
-    xs = torch.linspace(low_bound, high_bound, steps=steps)
-    ys = torch.linspace(low_bound, high_bound, steps=steps)
+def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=False, steps=100, center_mu=1e4,
+                               center_lambda=1e4,
+                               radius_mu=3500, radius_lambda=3500):
     global total_iterations
+    xs = torch.linspace(center_mu - radius_mu, center_mu + radius_mu, steps=steps)
+    ys = torch.linspace(center_lambda - radius_lambda, center_lambda + radius_lambda, steps=steps)
     total_iterations = len(xs) * len(ys)
     X, Y = np.meshgrid(xs, ys)
+
     if not load:
         Z = function(X, Y)
         np.savez(output_filename, Z)
@@ -106,7 +112,10 @@ def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=F
 
 
 if __name__ == '__main__':
-    loss = get_loss(1e4, 1e4)
+    steps = 2
+    center_mu = 384615
+    center_lambda = 576923
+    loss = get_loss(center_mu, center_lambda)
     print(f"Loss at known optimum: {loss}")
-    output_filename = f"{output_dir}/fearless_temp.npz"
-    plot_joined_loss_landscape(output_filename, load=False, steps=2)
+    output_filename = f"{output_dir}/mse_correspondence.npz"
+    plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu, center_lambda=center_lambda)

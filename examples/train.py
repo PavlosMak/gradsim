@@ -12,6 +12,9 @@ from gradsim import dflex as df
 from utils import *
 
 from scipy.spatial import KDTree
+from losses import *
+
+from pytorch3d.loss import chamfer_distance
 
 from logging_utils import wandb_log_curve
 
@@ -69,13 +72,8 @@ if __name__ == "__main__":
 
     gt_mu, gt_lambda = get_ground_truth_lame(simulation_config)
     gt_mu, gt_lambda = torch.tensor(gt_mu), torch.tensor(gt_lambda)
-
-    # Create correspondences
-    tree = KDTree(positions_pseudo_gt[0])
-    index_map = {}
-    for pi, p in enumerate(points):
-        dist, index = tree.query(p)
-        index_map[pi] = (index, dist)
+    gt_E, gt_nu = get_ground_truth_young(simulation_config)
+    gt_E, gt_nu = torch.tensor(gt_E), torch.tensor(gt_nu)
 
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
@@ -92,28 +90,38 @@ if __name__ == "__main__":
     initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
     gt_mass = model.particle_inv_mass.clone()
     # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
-    initial_mu = torch.rand(1) * 1e4
-    initial_lambda = torch.rand(1) * 1e4
+
+    if "mu_initialization" not in training_config:
+        initial_mu = torch.rand(1) * 1e4
+    else:
+        initial_mu = eval(training_config["mu_initialization"])
+
+    if "lambda_initialization" not in training_config:
+        # initial_lambda = torch.rand(1) * 1e4
+        initial_lambda = torch.tensor(575000, dtype=torch.float32)
+    else:
+        initial_lambda = eval(training_config["lambda_initialization"])
     # initial_masses = model.particle_inv_mass + 10*torch.rand_like(model.particle_inv_mass)
     initial_masses = 50 * torch.rand_like(model.particle_inv_mass)
     physical_model = PhysicalModel(initial_mu=initial_mu,
                                    initial_lambda=initial_lambda,
                                    initial_velocity=initial_velocity_estimate,
                                    initial_masses=initial_masses,
-                                   update_scale_velocity=1.0, update_scale_lame=10, update_scale_masses=1.0)
+                                   update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
         physical_model.load_state_dict(torch.load(f"{checkpoint_path}/physical_model.pth"))
 
     optimizer = initialize_optimizer(training_config, physical_model)
+    fixed_corr_loss = FixedCorrespondenceDistanceLoss(positions_pseudo_gt[0], points)
 
     # Do one run before training to get full duration unoptimized
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
-                                                      sim_dt, render_steps, physical_model)
+                                                      sim_dt, render_steps, None)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -137,7 +145,9 @@ if __name__ == "__main__":
             # TODO Add lossfn here as well
             loss = training_frame_count * mse(positions[start:end], positions_pseudo_gt[start:end])
         else:
-            loss = lossfn(positions, positions_pseudo_gt, index_map)
+            # loss = lossfn(positions, positions_pseudo_gt, index_map)
+            # loss = fixed_corr_loss(positions, positions_pseudo_gt)
+            loss = chamfer_distance(positions, positions_pseudo_gt)[0]
             # loss = mse(positions, positions_pseudo_gt[:training_frame_count])
 
         loss.backward()
@@ -161,6 +171,12 @@ if __name__ == "__main__":
             lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
             lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
 
+            estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
+            print(f"E estimate: {estimated_E}")
+            print(f"Nu estimate: {estimated_nu}")
+            e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E))
+            nu_error = torch.abs(estimated_nu - gt_nu)
+
             velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
 
@@ -169,16 +185,15 @@ if __name__ == "__main__":
 
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
-                       "Mu Abs Error Log10": mu_loss,
                        "Mu Relative Error": mu_mape,
                        "Mu Grad": physical_model.mu_update.grad,
                        "Lambda": estimated_lambda,
-                       "Lambda Abs Error Log10": lambda_loss,
                        "Lambda Relative Error": lambda_mape,
                        "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference,
                        # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
-                       "Mass Sqrd Error": mass_sqrd_error.item()})
+                       "LogE Abs Error": e_log_error,
+                       "Nu Abs Error": nu_error})
 
         if loss < 0.0002:
             # We converged.

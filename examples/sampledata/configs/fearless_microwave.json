@@ -1,27 +1,37 @@
 {
   "mesh": "sampledata/morning_cloud.obj",
   "sim_duration": 2.0,
-  "sim_substeps": 400,
+  "sim_substeps": 1100,
   "physics_engine_rate": 24,
-  "position": [0, 1.4, 0],
+  "position": [
+    0,
+    1.4,
+    0
+  ],
   "scale": 3,
-  "initial_velocity": [1, -1, 0],
+  "initial_velocity": [
+    1,
+    -1,
+    0
+  ],
   "density": 10.0,
-  "mu": 1.0e4,
-  "lambda": 1.0e4,
+  "mu": 384615,
+  "lambda": 576923,
   "damp": 1,
   "training": {
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/pseudo_gt_positions.npz",
     "exp_name": "fearless-microwave",
     "frame_count": 14,
-    "epochs": 1,
+    "epochs": 10,
     "seed": 42,
     "lr": {
-      "mu": 80,
-      "lambda": 80,
+      "mu": 200,
+      "lambda": 200,
       "velocity": 0.05,
       "mass": 0
     },
+    "mu_initialization": "383000.0 + 1e3*torch.rand(1)",
+    "lambda_initialization": "575000.0 + 1e3*torch.rand(1)",
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",

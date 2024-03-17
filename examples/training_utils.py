@@ -122,15 +122,3 @@ def load_gt_positions(training_config: dict):
     else:
         positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
     return positions_pseudo_gt
-
-
-def lossfn(predicted_positions, gt_positions, index_map):
-    total_loss = torch.zeros(1)
-    frames = predicted_positions.shape[0]
-    for frame in range(frames):
-        loss = torch.zeros(1)
-        for pi in index_map:
-            ni, dist = index_map[pi]
-            loss += (torch.linalg.norm(predicted_positions[frame][pi] - gt_positions[frame][ni]) - dist) ** 2
-        total_loss += (loss / len(index_map))
-    return total_loss / frames

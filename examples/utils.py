@@ -96,8 +96,6 @@ def get_volumes(tet_indices, vertex_buffer):
     return torch.stack(tet_volumes)
 
 
-
-
 def lame_from_young(E: float, nu: float):
     """
     Calculate the Lame parameters from Young's modulus
@@ -112,11 +110,26 @@ def lame_from_young(E: float, nu: float):
     return mu, lam
 
 
+def young_from_lame(mu, lam):
+    E = 2 * (1 + (lam / (2 * mu + 2 * lam))) * mu
+    nu = lam / (2 * mu + 2 * lam)
+    return E, nu
+
+
 def get_ground_truth_lame(simulation_config: dict) -> (float, float):
     if "E" in simulation_config["training"] and "nu" in simulation_config["training"]:
         training_config = simulation_config["training"]
         return lame_from_young(training_config["E"], training_config["nu"])
     return simulation_config["mu"], simulation_config["lambda"]
+
+
+def get_ground_truth_young(simulation_config: dict) -> (float, float):
+    if "E" in simulation_config["training"] and "nu" in simulation_config["training"]:
+        training_config = simulation_config["training"]
+        return training_config["E"], training_config["nu"]
+    else:
+        return young_from_lame(simulation_config["mu"], simulation_config["lambda"])
+
 
 def save_positions(positions: torch.Tensor, filename: str) -> None:
     positions_np = np.array([p.detach().cpu().numpy() for p in positions])
