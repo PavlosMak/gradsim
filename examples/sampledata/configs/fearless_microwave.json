@@ -1,7 +1,7 @@
 {
   "mesh": "sampledata/morning_cloud.obj",
   "sim_duration": 2.0,
-  "sim_substeps": 1100,
+  "sim_substeps": 1750,
   "physics_engine_rate": 24,
   "position": [
     0,
@@ -9,11 +9,7 @@
     0
   ],
   "scale": 3,
-  "initial_velocity": [
-    1,
-    -1,
-    0
-  ],
+  "initial_velocity": [-2.5, -7.5, -3.0],
   "density": 10.0,
   "mu": 384615,
   "lambda": 576923,
@@ -22,12 +18,12 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/pseudo_gt_positions.npz",
     "exp_name": "fearless-microwave",
     "frame_count": 14,
-    "epochs": 10,
+    "epochs": 50,
     "seed": 42,
     "lr": {
       "mu": 200,
       "lambda": 200,
-      "velocity": 0.05,
+      "velocity": 0.5,
       "mass": 0
     },
     "mu_initialization": "383000.0 + 1e3*torch.rand(1)",
@@ -40,7 +36,7 @@
     "offset_floor": true,
     "E": 1e6,
     "nu": 0.3,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/alpha_wrap.obj",
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/alpha_sim_mesh.obj",
     "eval_for": 20,
     "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
     "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",

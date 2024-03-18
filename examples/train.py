@@ -78,7 +78,7 @@ if __name__ == "__main__":
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
     velocity = tuple(simulation_config["initial_velocity"])
-    scale = 1.0
+    scale = 1.03
     density = simulation_config["density"]
     k_mu = simulation_config["mu"]
     k_lambda = simulation_config["lambda"]
@@ -87,7 +87,7 @@ if __name__ == "__main__":
     model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
                           k_lambda, k_damp)
 
-    initial_velocity_estimate = sim_scale * torch.mean(positions_pseudo_gt[1] - positions_pseudo_gt[0], dim=0)
+    initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
     gt_mass = model.particle_inv_mass.clone()
     # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
                                                       sim_dt, render_steps, None)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
-
+    exit(0)
     epochs = training_config["epochs"]
     losses = []
     mu_estimates = []

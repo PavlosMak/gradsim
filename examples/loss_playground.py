@@ -17,6 +17,8 @@ from pytorch3d.loss import chamfer_distance
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
 path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/fearless_microwave.json"
+# path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus.json"
+
 
 with open(path_to_config) as config_file:
     simulation_config = json.load(config_file)
@@ -37,7 +39,6 @@ k_damp = simulation_config["damp"]
 
 r2 = eval(training_config["sim_mesh_rotation"])
 sim_scale = training_config["sim_scale"]
-
 points, tet_indices = load_mesh(training_config["training_mesh"])
 points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
 
@@ -51,6 +52,7 @@ render_steps = simulation_config["sim_substeps"]
 mse = torch.nn.MSELoss(reduction="sum")
 fixedcorrloss = FixedCorrespondenceDistanceLoss(positions_pseudo_gt[0], points)
 msecorrloss = MSECorrespondencesLoss(positions_pseudo_gt[0], points)
+closest_loss = ClosestOnlyLoss(positions_pseudo_gt[0], points)
 
 total_iterations = 0
 progress_counter = 0
@@ -67,17 +69,19 @@ def get_loss(x, y) -> float:
     k_lambda = y
     with torch.no_grad():
         positions, model, _, _ = forward_pass(position, df.quat_identity(),
-                                              scale, velocity, points, tet_indices, density,
+                                              1.0, velocity, points, tet_indices, density,
                                               k_mu, k_lambda, k_damp, training_sim_steps,
                                               sim_dt, render_steps, mass_noise=mass_noise)
         save_positions(positions, f"{output_dir}/positions_pred.npz")
         weights = torch.ones(training_frame_count)
+        # weights[12:16] = 1
         C = 1
         # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
         # loss = torch.zeros(1)
         # loss = lossfn(positions, positions_pseudo_gt)
-        loss = chamfer_distance(positions, positions_pseudo_gt)[0]
+        # loss = chamfer_distance(positions, positions_pseudo_gt)[0]
         # loss = msecorrloss(positions, positions_pseudo_gt)
+        loss = closest_loss(positions, positions_pseudo_gt)
     return loss.item()
 
 
@@ -112,10 +116,12 @@ def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=F
 
 
 if __name__ == '__main__':
-    steps = 2
+    steps = 4
     center_mu = 384615
     center_lambda = 576923
+    # center_mu = 1e4
+    # center_lambda = 1e4
     loss = get_loss(center_mu, center_lambda)
     print(f"Loss at known optimum: {loss}")
-    output_filename = f"{output_dir}/mse_correspondence.npz"
+    output_filename = f"{output_dir}/weights.npz"
     plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu, center_lambda=center_lambda)

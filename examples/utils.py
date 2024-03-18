@@ -4,7 +4,7 @@ import tetgen
 import torch
 
 from kaolin.io.obj import import_mesh
-
+import matplotlib.pyplot as plt
 
 def export_obj(vertices, faces, filepath):
     """
@@ -134,3 +134,21 @@ def get_ground_truth_young(simulation_config: dict) -> (float, float):
 def save_positions(positions: torch.Tensor, filename: str) -> None:
     positions_np = np.array([p.detach().cpu().numpy() for p in positions])
     np.savez(filename, positions_np)
+
+def plot_histogram(data, bins=10, xlabel="Values", ylabel="Frequency", title="Histogram"):
+    """
+    Plots a histogram from a list of data.
+
+    Parameters:
+    - data: List of numerical data.
+    - bins: Number of bins for the histogram. Default is 10.
+    - xlabel: Label for the x-axis. Default is "Values".
+    - ylabel: Label for the y-axis. Default is "Frequency".
+    - title: Title of the histogram plot. Default is "Histogram".
+    """
+    plt.hist(data, bins=bins, color='skyblue', edgecolor='black')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.grid(True)
+    plt.show()
