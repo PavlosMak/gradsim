@@ -56,7 +56,8 @@ def tetrahedralize(vertices, faces, order=1, mindihedral=5, minratio=20):
     # tet.tetrahedralize()
     faces = tet.grid.cells_dict[pv.CellType.TETRA]
     faces = [f for face in faces for f in face]
-    return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces
+    surface_points = np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32)[:len(verts)]
+    return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces, surface_points
 
 
 def load_tet_directory(path: str):
@@ -74,12 +75,13 @@ def load_pseudo_gt_mesh(path: str):
 
 
 def load_mesh(path: str, load_from_gaussians=False):
+    surface_points = None #TODO: TERRIBLE, MAKE BETTER
     if path.endswith(".tet"):
         points, tet_indices = read_tet_mesh(path)
     else:
         mesh = import_mesh(path)
-        points, tet_indices = tetrahedralize(mesh.vertices, mesh.faces)
-    return points, tet_indices
+        points, tet_indices, surface_points = tetrahedralize(mesh.vertices, mesh.faces)
+    return points, tet_indices, surface_points
 
 
 def get_tet_volume(v0, v1, v2, v3):

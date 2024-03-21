@@ -53,7 +53,6 @@ if __name__ == "__main__":
     #     print(f"Using Training mesh {training_config['training_mesh']}")
     #     points, tet_indices = load_mesh(training_config["training_mesh"])
     points, tet_indices = load_tet_directory("/media/pavlos/One Touch/datasets/gt_generation/magic-salad/tetrahedrals")
-
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
@@ -91,18 +90,18 @@ if __name__ == "__main__":
     model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
                           k_lambda, k_damp)
 
-    # initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
-    initial_velocity_estimate = torch.tensor([-1, -1, 0.0])
+    initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
+    # initial_velocity_estimate = torch.tensor([-1, -1, 0.0])
     gt_mass = model.particle_inv_mass.clone()
     # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
 
     if "mu_initialization" not in training_config:
-        initial_mu = torch.rand(1) * 1e4
+        initial_mu = torch.rand(1) * 1e3
     else:
         initial_mu = eval(training_config["mu_initialization"])
 
     if "lambda_initialization" not in training_config:
-        initial_lambda = torch.rand(1) * 1e4
+        initial_lambda = torch.rand(1) * 1e3
     else:
         initial_lambda = eval(training_config["lambda_initialization"])
     # initial_masses = model.particle_inv_mass + 10*torch.rand_like(model.particle_inv_mass)
@@ -126,7 +125,7 @@ if __name__ == "__main__":
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
-                                                      sim_dt, render_steps, None)
+                                                      sim_dt, render_steps, physical_model)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -149,10 +148,17 @@ if __name__ == "__main__":
             end = training_config["loss_end_frame"]
             # TODO THIS IS MESSED UP NOW, FIX IT
             # loss = training_frame_count * mse(positions[start:end], positions_pseudo_gt[start:end])
-            loss = chamfer_distance(positions, positions_pseudo_gt)
-        else:
-            # loss = training_frame_count * mse(positions, positions_pseudo_gt)
             loss = chamfer_distance(positions, positions_pseudo_gt)[0]
+        else:
+            # weights = torch.zeros(training_frame_count)
+            # C = 1
+            # weights[12:16] = 6
+            # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
+            # loss = mse(positions, positions_pseudo_gt)
+            # loss = chamfer_distance(positions, positions_pseudo_gt)[0]
+            loss = len(positions) * chamfer_distance(positions[17:20], positions_pseudo_gt[17:20])[0]
+
+            # loss = chamfer_distance(positions, positions_pseudo_gt)[0]
         loss.backward()
         optimizer.step()
 
