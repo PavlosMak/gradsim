@@ -46,11 +46,14 @@ if __name__ == "__main__":
     render_steps = simulation_config["sim_substeps"]
     path_to_exp = f"{training_config['path_to_gt']}/{training_config['exp_name']}"
 
-    if "training_mesh" not in training_config:
-        points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
-    else:
-        print(f"Using Training mesh {training_config['training_mesh']}")
-        points, tet_indices = load_mesh(training_config["training_mesh"])
+    # TODO: CLEAN UP
+    # if "training_mesh" not in training_config:
+    #     points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
+    # else:
+    #     print(f"Using Training mesh {training_config['training_mesh']}")
+    #     points, tet_indices = load_mesh(training_config["training_mesh"])
+    points, tet_indices = load_tet_directory("/media/pavlos/One Touch/datasets/gt_generation/magic-salad/tetrahedrals")
+
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
@@ -77,8 +80,9 @@ if __name__ == "__main__":
 
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
-    velocity = tuple(simulation_config["initial_velocity"])
-    scale = 1.03
+    # velocity = tuple(simulation_config["initial_velocity"])
+    velocity = tuple((-1, -1, 0))
+    scale = 1.0
     density = simulation_config["density"]
     k_mu = simulation_config["mu"]
     k_lambda = simulation_config["lambda"]
@@ -88,7 +92,7 @@ if __name__ == "__main__":
                           k_lambda, k_damp)
 
     # initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
-    initial_velocity_estimate = torch.tensor([-2.5, -7.5, -3.0])
+    initial_velocity_estimate = torch.tensor([-1, -1, 0.0])
     gt_mass = model.particle_inv_mass.clone()
     # initial_mu = torch.tensor(1e4) + 100 * torch.rand(1)
 
@@ -98,8 +102,7 @@ if __name__ == "__main__":
         initial_mu = eval(training_config["mu_initialization"])
 
     if "lambda_initialization" not in training_config:
-        # initial_lambda = torch.rand(1) * 1e4
-        initial_lambda = torch.tensor(575000, dtype=torch.float32)
+        initial_lambda = torch.rand(1) * 1e4
     else:
         initial_lambda = eval(training_config["lambda_initialization"])
     # initial_masses = model.particle_inv_mass + 10*torch.rand_like(model.particle_inv_mass)
@@ -144,10 +147,12 @@ if __name__ == "__main__":
         if "loss_start_frame" in training_config and "loss_end_frame" in training_config:
             start = training_config["loss_start_frame"]
             end = training_config["loss_end_frame"]
-            # TODO Add lossfn here as well
-            loss = training_frame_count * mse(positions[start:end], positions_pseudo_gt[start:end])
+            # TODO THIS IS MESSED UP NOW, FIX IT
+            # loss = training_frame_count * mse(positions[start:end], positions_pseudo_gt[start:end])
+            loss = chamfer_distance(positions, positions_pseudo_gt)
         else:
-            loss = training_frame_count * mse(positions, positions_pseudo_gt)
+            # loss = training_frame_count * mse(positions, positions_pseudo_gt)
+            loss = chamfer_distance(positions, positions_pseudo_gt)[0]
         loss.backward()
         optimizer.step()
 

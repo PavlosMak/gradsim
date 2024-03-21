@@ -59,6 +59,11 @@ def tetrahedralize(vertices, faces, order=1, mindihedral=5, minratio=20):
     return np.asarray(tet.grid.points, dtype=np.float32).astype(np.float32), faces
 
 
+def load_tet_directory(path: str):
+    verts = np.loadtxt(f"{path}/verts.txt", delimiter=",")
+    tet_indices = np.loadtxt(f"{path}/tets.txt").astype(np.int32)
+    return verts, tet_indices
+
 def load_pseudo_gt_mesh(path: str):
     path_to_mesh_data = f"{path}/filtered_meshes"
     # from the obj we will keep the faces

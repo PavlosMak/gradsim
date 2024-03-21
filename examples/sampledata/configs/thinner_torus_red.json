@@ -1,6 +1,6 @@
 {
   "mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/thinner_torus/torus.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/gradsim_deformations/thinner_torus",
+  "outdir": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/temp",
   "sim_duration": 2.0,
   "sim_substeps": 100,
   "physics_engine_rate": 24,
@@ -13,26 +13,26 @@
   "lambda": 1.0e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/royal-field/registered_sliding.npz",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/pseudo_gt_positions.npz",
     "exp_name": "thinner_torus",
-    "frame_count": 7,
+    "frame_count": 20,
     "epochs": 1,
     "seed": 42,
     "lr": {
       "mu": 80,
       "lambda": 80,
-      "velocity": 0.05,
+      "velocity": 0.01,
       "mass": 0
     },
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
-    "sim_scale": 7,
-    "gt_scale": 7,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/royal-field/training_mesh.obj",
+    "sim_scale": 1,
+    "gt_scale": 1,
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/training_mesh.obj",
     "eval_for": 40,
     "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
-    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
     "transform_gt_points": true
   }
 }

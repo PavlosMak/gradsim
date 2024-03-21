@@ -66,9 +66,9 @@ def forward_pass(position, r, scale, velocity,
 
     if prediction_model:
         k_mu, k_lambda, velocity, masses = prediction_model()
-        model.tet_materials[:, 0] = k_mu
-        model.tet_materials[:, 1] = k_lambda
-        model.particle_v[:, ] = velocity
+        # model.tet_materials[:, 0] = k_mu
+        # model.tet_materials[:, 1] = k_lambda
+        # model.particle_v[:, ] = velocity
         # model.particle_inv_mass = masses
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
@@ -85,6 +85,7 @@ def forward_pass(position, r, scale, velocity,
         sim_time += sim_dt
 
         if i % render_steps == 0:
+            # print(f"Frame: {i / render_steps} velocity: {torch.mean(state.u, dim=0)}")
             positions.append(state.q)
 
     positions = torch.stack(positions)
