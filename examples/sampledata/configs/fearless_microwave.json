@@ -18,7 +18,7 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/fearless-microwave/pseudo_gt_positions.npz",
     "exp_name": "fearless-microwave",
     "frame_count": 14,
-    "epochs": 50,
+    "epochs": 25,
     "seed": 42,
     "lr": {
       "mu": 200,

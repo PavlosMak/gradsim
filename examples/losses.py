@@ -67,7 +67,7 @@ class ClosestOnlyLoss:
         save_positions(neighbors, "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output/matches.npz")
         save_positions(torch.stack(mathcing_points),
                        "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output/positions.npz")
-        plot_histogram(dists)
+        # plot_histogram(dists)
 
     def __call__(self, predicted_positions, target_positions):
         total_loss = torch.zeros(1)
