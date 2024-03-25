@@ -6,7 +6,7 @@ import math
 
 from torch.nn import MSELoss
 
-from examples.utils import load_mesh, save_positions
+from examples.utils import load_mesh, save_positions, load_tet_directory
 from gradsim import dflex as df
 
 from examples.training_utils import load_gt_positions, forward_pass
@@ -16,7 +16,7 @@ from pytorch3d.loss import chamfer_distance
 
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
-path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/fearless_microwave.json"
+path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus_red.json"
 # path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus.json"
 
 
@@ -39,7 +39,8 @@ k_damp = simulation_config["damp"]
 
 r2 = eval(training_config["sim_mesh_rotation"])
 sim_scale = training_config["sim_scale"]
-points, tet_indices = load_mesh(training_config["training_mesh"])
+# points, tet_indices = load_mesh(training_config["training_mesh"])
+points, tet_indices = load_tet_directory("/media/pavlos/One Touch/datasets/gt_generation/magic-salad/tetrahedrals")
 points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
 
 training_frame_count = training_config["frame_count"]
@@ -79,9 +80,9 @@ def get_loss(x, y) -> float:
         # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
         # loss = torch.zeros(1)
         # loss = lossfn(positions, positions_pseudo_gt)
-        # loss = chamfer_distance(positions, positions_pseudo_gt)[0]
+        loss = len(positions)*chamfer_distance(positions[17:20], positions_pseudo_gt[17:20])[0]
         # loss = msecorrloss(positions, positions_pseudo_gt)
-        loss = closest_loss(positions, positions_pseudo_gt)
+        # loss = closest_loss(positions, positions_pseudo_gt)
     return loss.item()
 
 
@@ -115,13 +116,38 @@ def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=F
     plt.show()
 
 
+def plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name, radius=3500, steps=5, load=False, function=vectorized_loss):
+    global total_iterations
+
+    low_bound = center_lambda - radius
+    high_bound = center_lambda + radius
+
+    xs = torch.linspace(low_bound, high_bound, steps=steps)
+    ys = torch.ones_like(xs) * center_mu
+    total_iterations = len(xs) * len(ys)
+    X, Y = np.meshgrid(xs, ys)
+
+    if not load:
+        zs = function(Y, X)
+        np.savez(output_file_name, zs)
+    else:
+        zs = np.load(f"{output_dir}/lambda_loss_landscape.npz")["arr_0"]
+
+    plt.plot(xs, zs)
+    plt.xlabel("$\lambda$")
+    plt.ylabel("Loss")
+    plt.show()
+
 if __name__ == '__main__':
-    steps = 4
-    center_mu = 384615
-    center_lambda = 576923
-    # center_mu = 1e4
-    # center_lambda = 1e4
+    steps = 10
+    # center_mu = 384615
+    # center_lambda = 576923
+    center_mu = 1e4
+    center_lambda = 1e4
     loss = get_loss(center_mu, center_lambda)
     print(f"Loss at known optimum: {loss}")
     output_filename = f"{output_dir}/weights.npz"
-    plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu, center_lambda=center_lambda)
+    # output_filename = f"{output_dir}/lambda_loss_landscape.npz"
+    plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu,
+                               center_lambda=center_lambda)
+    # plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name=output_filename, steps=5)
