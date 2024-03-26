@@ -58,7 +58,8 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
-                 prediction_model=None, mass_noise=None, fix_top_plane=False):
+                 prediction_model=None, mass_noise=None, fix_top_plane=False,
+                 optimization_set={"mu", "lambda", "velocity", "masses"}):
     model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
 
     if mass_noise is not None:
@@ -66,10 +67,14 @@ def forward_pass(position, r, scale, velocity,
 
     if prediction_model:
         k_mu, k_lambda, velocity, masses = prediction_model()
-        model.tet_materials[:, 0] = k_mu
-        model.tet_materials[:, 1] = k_lambda
-        model.particle_v[:, ] = velocity
-        # model.particle_inv_mass = masses
+        if "mu" in optimization_set:
+            model.tet_materials[:, 0] = k_mu
+        if "lambda" in optimization_set:
+            model.tet_materials[:, 1] = k_lambda
+        if "velocity" in optimization_set:
+            model.particle_v[:, ] = velocity
+        if "masses" in optimization_set:
+            model.particle_inv_mass = masses
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
@@ -132,3 +137,9 @@ def load_gt_positions(training_config: dict):
     else:
         positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
     return positions_pseudo_gt
+
+
+def initialize_from_config(training_config, field_name, default_value):
+    if field_name in training_config:
+        return eval(training_config[field_name])
+    return default_value

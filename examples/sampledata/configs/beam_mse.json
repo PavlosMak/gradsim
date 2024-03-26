@@ -28,8 +28,8 @@
     "epochs": 1500,
     "seed": 42,
     "loss": {
-      "name": "chamfer",
-      "batch_reduction": "mean"
+      "name": "mse",
+      "reduction": "sum"
     },
     "lr": {
       "mu": 250,

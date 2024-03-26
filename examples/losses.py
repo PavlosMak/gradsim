@@ -1,81 +1,38 @@
-import numpy as np
-from scipy.spatial import KDTree
 import torch
-from utils import save_positions, plot_histogram
+
+from pytorch3d.loss import chamfer_distance
 
 
-class FixedCorrespondenceDistanceLoss:
-    def __init__(self, canonical_gt_positions, positions):
-        self.tree = KDTree(canonical_gt_positions)
-        self.index_map = {}
-        for pi, p in enumerate(positions):
-            dist, index = self.tree.query(p)
-            self.index_map[pi] = (index, dist)
-
-    def __call__(self, predicted_positions, target_positions):
-        total_loss = torch.zeros(1)
-        frames = predicted_positions.shape[0]
-        for frame in range(frames):
-            loss = torch.zeros(1)
-            for pi in self.index_map:
-                ni, dist = self.index_map[pi]
-                loss += (torch.linalg.norm(predicted_positions[frame][pi] - target_positions[frame][ni]) - dist) ** 2
-            total_loss += (loss / len(self.index_map))
-        return total_loss / frames
+def reduction_parser(reduction_string: str):
+    """If the string is 'none'/'None' then return None, otherwise return the string."""
+    if reduction_string.capitalize() == "None":
+        return None
+    return reduction_string
 
 
-class MSECorrespondencesLoss:
-    def __init__(self, canonical_gt_positions, positions):
-        self.tree = KDTree(canonical_gt_positions)
-        self.index_map = {}
-        for pi, p in enumerate(positions):
-            _, index = self.tree.query(p)
-            self.index_map[pi] = index
-
-    def __call__(self, predicted_positions, target_positions):
-        total_loss = torch.zeros(1)
-        frames = predicted_positions.shape[0]
-        for frame in range(frames):
-            loss = torch.zeros(1)
-            for pi in self.index_map:
-                ni = self.index_map[pi]
-                loss += torch.sum((predicted_positions[frame][pi] - target_positions[frame][ni]) ** 2)
-            total_loss += (loss / len(self.index_map))
-        return total_loss / frames
+def loss_factory(training_config: dict):
+    loss_config = training_config["loss"]
+    if loss_config["name"] == "chamfer":
+        return Chamfer.init_from_config(loss_config)
+    elif loss_config["name"] == "mse":
+        reduction = reduction_parser(loss_config["reduction"])
+        return torch.nn.MSELoss(reduction=reduction)
+    else:
+        raise ValueError(f"No such loss: {loss_config}")
 
 
-class ClosestOnlyLoss:
-    def __init__(self, canonical_gt_positions, positions):
-        self.tree = KDTree(canonical_gt_positions)
-        self.index_map = {}
+class Chamfer:
+    """
+    Small wrapper around the Chamfer distance metric from pytorch3D, so we can
+    make a callable object that performs it.
+    """
 
+    def __init__(self, batch_reduction: str):
+        self.batch_reduction = reduction_parser(batch_reduction)
 
-        neighbors = []
-        mathcing_points = []
-        dists = []
-
-        for pi, p in enumerate(positions):
-            dist, index = self.tree.query(p)
-
-            if dist <= 0.1:
-                neighbors.append(canonical_gt_positions[index])
-                dists.append(dist)
-                mathcing_points.append(torch.tensor(p))
-                self.index_map[pi] = index
-
-        neighbors = torch.stack(neighbors)
-        save_positions(neighbors, "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output/matches.npz")
-        save_positions(torch.stack(mathcing_points),
-                       "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output/positions.npz")
-        # plot_histogram(dists)
+    def init_from_config(config: dict):
+        batch_reduction = config["batch_reduction"]
+        return Chamfer(batch_reduction)
 
     def __call__(self, predicted_positions, target_positions):
-        total_loss = torch.zeros(1)
-        frames = predicted_positions.shape[0]
-        for frame in range(frames):
-            loss = torch.zeros(1)
-            for pi in self.index_map:
-                ni = self.index_map[pi]
-                loss += torch.sum((predicted_positions[frame][pi] - target_positions[frame][ni]) ** 2)
-            total_loss += (loss / len(self.index_map))
-        return total_loss / frames
+        return chamfer_distance(predicted_positions, target_positions, batch_reduction=self.batch_reduction)[0]
