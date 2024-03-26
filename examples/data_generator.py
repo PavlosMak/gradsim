@@ -21,7 +21,7 @@ if __name__ == "__main__":
         simulation_config = json.load(config_file)
 
     # Load simulation mesh
-    points, tet_indices = load_mesh(simulation_config["mesh"])
+    points, tet_indices, _ = load_mesh(simulation_config["mesh"])
     print(f"Running simulation with {len(points)} particles and {len(tet_indices) // 4} tetrahedra")
 
     # Get simulation configurations
@@ -36,6 +36,10 @@ if __name__ == "__main__":
 
     particle_inv_mass = None
 
+    fix_top_plane = False
+    if "fix_top_plane" in simulation_config:
+        fix_top_plane = simulation_config["fix_top_plane"]
+
     with torch.no_grad():
         sim_dt = (1.0 / simulation_config["physics_engine_rate"]) / simulation_config["sim_substeps"]
         sim_steps = int(simulation_config["sim_duration"] / sim_dt)
@@ -45,7 +49,7 @@ if __name__ == "__main__":
         positions, model, state, average_initial_velocity = forward_pass(position, r,
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
-                                                                         sim_steps, sim_dt, render_steps)
+                                                                         sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane)
     # Output results
     outdir = simulation_config["outdir"]
     masses = model.particle_inv_mass.detach().cpu().numpy()

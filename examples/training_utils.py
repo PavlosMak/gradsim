@@ -58,7 +58,7 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
-                 prediction_model=None, mass_noise=None):
+                 prediction_model=None, mass_noise=None, fix_top_plane=False):
     model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
 
     if mass_noise is not None:
@@ -79,8 +79,17 @@ def forward_pass(position, r, scale, velocity,
 
     positions = []
 
+    if fix_top_plane:
+        mask = state.q[:, 1] == torch.max(state.q[:, 1])
+        original_pos = state.q[mask]
+        original_vel = torch.zeros_like(state.u[mask])
+
     for i in trange(0, sim_steps):
         state = integrator.forward(model, state, sim_dt)
+
+        if fix_top_plane:
+            state.q[mask] = original_pos
+            state.u[mask] = original_vel
 
         sim_time += sim_dt
 

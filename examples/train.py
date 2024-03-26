@@ -47,12 +47,12 @@ if __name__ == "__main__":
     path_to_exp = f"{training_config['path_to_gt']}/{training_config['exp_name']}"
 
     # TODO: CLEAN UP
-    # if "training_mesh" not in training_config:
-    #     points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
-    # else:
-    #     print(f"Using Training mesh {training_config['training_mesh']}")
-    #     points, tet_indices = load_mesh(training_config["training_mesh"])
-    points, tet_indices = load_tet_directory("/media/pavlos/One Touch/datasets/gt_generation/magic-salad/tetrahedrals")
+    if "training_mesh" not in training_config:
+        points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
+    else:
+        print(f"Using Training mesh {training_config['training_mesh']}")
+        points, tet_indices, _ = load_mesh(training_config["training_mesh"])
+    # points, tet_indices = load_tet_directory("/media/pavlos/One Touch/datasets/gt_generation/magic-salad/tetrahedrals")
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
@@ -79,8 +79,8 @@ if __name__ == "__main__":
 
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
-    # velocity = tuple(simulation_config["initial_velocity"])
-    velocity = tuple((-1, -1, 0))
+    velocity = tuple(simulation_config["initial_velocity"])
+    # velocity = tuple((-1, -1, 0))
     scale = 1.0
     density = simulation_config["density"]
     k_mu = simulation_config["mu"]
@@ -116,6 +116,10 @@ if __name__ == "__main__":
         checkpoint_path = training_config["checkpoint_path"]
         physical_model.load_state_dict(torch.load(f"{checkpoint_path}/physical_model.pth"))
 
+    fix_top_plane = False
+    if "fix_top_plane" in simulation_config:
+        fix_top_plane = simulation_config["fix_top_plane"]
+
     optimizer = initialize_optimizer(training_config, physical_model)
     # fixed_corr_loss = FixedCorrespondenceDistanceLoss(positions_pseudo_gt[0], points)
     # closest_loss = ClosestOnlyLoss(positions_pseudo_gt[0], points)
@@ -125,7 +129,7 @@ if __name__ == "__main__":
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
-                                                      sim_dt, render_steps, physical_model)
+                                                      sim_dt, render_steps, physical_model, fix_top_plane=fix_top_plane)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -141,7 +145,7 @@ if __name__ == "__main__":
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
                                                                          training_sim_steps, sim_dt, render_steps,
-                                                                         physical_model)
+                                                                         physical_model, fix_top_plane=fix_top_plane)
 
         if "loss_start_frame" in training_config and "loss_end_frame" in training_config:
             start = training_config["loss_start_frame"]
@@ -204,9 +208,9 @@ if __name__ == "__main__":
                        "LogE Abs Error": e_log_error,
                        "Nu Abs Error": nu_error})
 
-        if loss < 0.0002:
+        # if loss < 0.0002:
             # We converged.
-            break
+            # break
 
         optimizer.zero_grad()
 
@@ -220,7 +224,7 @@ if __name__ == "__main__":
     with torch.no_grad():
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
-                                          render_steps, physical_model)
+                                          render_steps, physical_model, fix_top_plane=fix_top_plane)
     save_positions(positions, f"{output_directory}/eval.npz")
 
     # Log loss landscapes

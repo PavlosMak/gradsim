@@ -80,18 +80,39 @@ def get_loss(x, y) -> float:
         # loss = (weights * torch.sum(torch.mean(C * (positions - positions_pseudo_gt) ** 2, dim=1), dim=1)).sum()
         # loss = torch.zeros(1)
         # loss = lossfn(positions, positions_pseudo_gt)
-        loss = len(positions)*chamfer_distance(positions[17:20], positions_pseudo_gt[17:20])[0]
+        loss = len(positions) * chamfer_distance(positions[17:20], positions_pseudo_gt[17:20])[0]
         # loss = msecorrloss(positions, positions_pseudo_gt)
         # loss = closest_loss(positions, positions_pseudo_gt)
     return loss.item()
 
 
-vectorized_loss = np.vectorize(get_loss)
+def get_E(x, y) -> float:
+    global progress_counter
+    print(f"{progress_counter}/{total_iterations}")
+    progress_counter += 1
+    k_mu = x
+    k_lambda = y
+    E = k_mu * (3 * k_mu + 2 * k_lambda) / (k_lambda + k_mu)
+    return E
 
+
+def get_nu(x, y) -> float:
+    global progress_counter
+    print(f"{progress_counter}/{total_iterations}")
+    progress_counter += 1
+    k_mu = x
+    k_lambda = y
+    nu = k_lambda / (2 * (k_lambda + k_mu))
+    return nu
+
+
+vectorized_loss = np.vectorize(get_loss)
+vectorized_E = np.vectorize(get_E)
+vectorized_nu = np.vectorize(get_nu)
 
 def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=False, steps=100, center_mu=1e4,
                                center_lambda=1e4,
-                               radius_mu=3500, radius_lambda=3500):
+                               radius_mu=3500, radius_lambda=3500, z_title="Loss"):
     global total_iterations
     xs = torch.linspace(center_mu - radius_mu, center_mu + radius_mu, steps=steps)
     ys = torch.linspace(center_lambda - radius_lambda, center_lambda + radius_lambda, steps=steps)
@@ -109,14 +130,15 @@ def plot_joined_loss_landscape(output_filename, function=vectorized_loss, load=F
     p = ax.plot_surface(X, Y, Z, cmap='viridis')
     ax.set_xlabel('$\mu$')
     ax.set_ylabel('$\lambda$')
-    ax.set_zlabel('Loss')
+    ax.set_zlabel(z_title)
 
     fig.colorbar(p, ax=ax)
 
     plt.show()
 
 
-def plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name, radius=3500, steps=5, load=False, function=vectorized_loss):
+def plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name, radius=3500, steps=5, load=False,
+                               function=vectorized_loss):
     global total_iterations
 
     low_bound = center_lambda - radius
@@ -138,6 +160,7 @@ def plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name, radiu
     plt.ylabel("Loss")
     plt.show()
 
+
 if __name__ == '__main__':
     steps = 10
     # center_mu = 384615
@@ -148,6 +171,9 @@ if __name__ == '__main__':
     print(f"Loss at known optimum: {loss}")
     output_filename = f"{output_dir}/weights.npz"
     # output_filename = f"{output_dir}/lambda_loss_landscape.npz"
-    plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu,
-                               center_lambda=center_lambda)
+    # plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu,
+    #                            center_lambda=center_lambda)
+    # plot_joined_loss_landscape(output_filename, load=False, steps=steps, center_mu=center_mu,
+    #                            center_lambda=center_lambda, function=vectorized_E, z_title="E")
+    plot_joined_loss_landscape(output_filename, steps=steps, center_mu=center_mu, center_lambda=center_lambda, function=vectorized_nu, z_title="$\\nu$")
     # plot_lambda_loss_landscape(center_mu, center_lambda, output_file_name=output_filename, steps=5)
