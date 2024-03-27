@@ -1,8 +1,8 @@
 {
-  "mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam/beam_remeshed.obj",
+  "mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam/beam.obj",
   "outdir": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam",
   "sim_duration": 2.0,
-  "sim_substeps": 40,
+  "sim_substeps": 32,
   "physics_engine_rate": 90,
   "position": [
     0,
@@ -10,7 +10,11 @@
     0
   ],
   "scale": 1,
-  "initial_velocity": [0, -10, 0.0],
+  "initial_velocity": [
+    0,
+    -10,
+    0.0
+  ],
   "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.0)",
   "density": 10.0,
   "mu": 1.0e4,
@@ -31,18 +35,19 @@
       "mu": 250,
       "lambda": 250,
       "velocity": 0.25,
-      "mass": 0.1
+      "mass": 0
     },
-    "optimize": ["mu", "lambda", "masses"],
+    "optimize": ["mu", "lambda"],
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
+    "gt_noise_scale": 0.1,
     "sim_scale": 1,
     "gt_scale": 1,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam/beam_remeshed.obj",
+    "training_mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam/beam.obj",
     "eval_for": 100,
     "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.0 * math.pi)",
-    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.0 * math.pi)",
     "transform_gt_points": true
   }
 }

@@ -107,6 +107,10 @@ if __name__ == "__main__":
     if "fix_top_plane" in simulation_config:
         fix_top_plane = simulation_config["fix_top_plane"]
 
+    if "gt_noise_scale" in training_config:
+        scale = training_config["gt_noise_scale"]
+        positions_pseudo_gt = positions_pseudo_gt + scale * torch.rand_like(positions_pseudo_gt)
+
     optimizer = initialize_optimizer(training_config, physical_model)
 
     # Do one run before training to get full duration unoptimized
