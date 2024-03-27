@@ -138,7 +138,7 @@ if __name__ == "__main__":
         loss.backward()
         optimizer.step()
 
-        if (e % training_config["logging_interval"] == 0 or e == epochs - 1) or loss < 2e-3:
+        if (e % training_config["logging_interval"] == 0 or e == epochs - 1):
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             losses.append(loss.item())
 
