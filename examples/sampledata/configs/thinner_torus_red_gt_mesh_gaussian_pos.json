@@ -4,27 +4,19 @@
   "sim_duration": 2.0,
   "sim_substeps": 100,
   "physics_engine_rate": 24,
-  "position": [
-    0,
-    0,
-    0
-  ],
+  "position": [0, 0, 0],
   "scale": 7,
-  "initial_velocity": [
-    -0.0377,
-    -1.0445,
-    0.9456
-  ],
+  "initial_velocity": [1, -1, 0],
   "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -math.pi * 0.5)",
   "density": 10.0,
   "mu": 1.0e4,
   "lambda": 1.0e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/registered_sliding.npz",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/pseudo_gt_positions.npz",
     "exp_name": "thinner_torus",
     "frame_count": 20,
-    "epochs": 120,
+    "epochs": 1,
     "seed": 42,
     "lr": {
       "mu": 250,
@@ -36,20 +28,16 @@
       "name": "chamfer",
       "batch_reduction": "mean"
     },
-    "optimize": [
-      "mu",
-      "lambda",
-      "velocity"
-    ],
+    "optimize": ["mu", "lambda", "velocity"],
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
-    "sim_scale": 1,
+    "sim_scale": 7,
     "gt_scale": 1,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/training_mesh.obj",
+    "training_mesh": "/media/pavlos/One Touch/datasets/gradsim_deformations/thinner_torus/torus.obj",
     "eval_for": 40,
-    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
-    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "gt_rotation": "df.quat_multiply(df.quat_from_axis_angle((0.0, 1.0, 0.0), 0.5*math.pi), df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi))",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
     "transform_gt_points": true
   }
 }

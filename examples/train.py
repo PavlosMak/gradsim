@@ -63,10 +63,6 @@ if __name__ == "__main__":
     # Correct point coordinate system
     points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
 
-    # Log ground truth positions
-    positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
-    np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
-
     gt_mu, gt_lambda = get_ground_truth_lame(simulation_config)
     gt_mu, gt_lambda = torch.tensor(gt_mu), torch.tensor(gt_lambda)
     gt_E, gt_nu = get_ground_truth_young(simulation_config)
@@ -110,6 +106,10 @@ if __name__ == "__main__":
     if "gt_noise_scale" in training_config:
         scale = training_config["gt_noise_scale"]
         positions_pseudo_gt = positions_pseudo_gt + scale * torch.rand_like(positions_pseudo_gt)
+
+    # Log ground truth positions
+    positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
+    np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
 
     optimizer = initialize_optimizer(training_config, physical_model)
 
