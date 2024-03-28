@@ -25,7 +25,7 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gradsim_deformations/beam/positions_gt.npz",
     "exp_name": "beam",
     "frame_count": 50,
-    "epochs": 1500,
+    "epochs": 200,
     "seed": 42,
     "loss": {
       "name": "chamfer",

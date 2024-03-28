@@ -6,6 +6,7 @@ import torch
 from kaolin.io.obj import import_mesh
 import matplotlib.pyplot as plt
 
+
 def export_obj(vertices, faces, filepath):
     """
     Export vertices and faces to a Wavefront OBJ file.
@@ -65,6 +66,7 @@ def load_tet_directory(path: str):
     tet_indices = np.loadtxt(f"{path}/tets.txt").astype(np.int32)
     return verts, tet_indices
 
+
 def load_pseudo_gt_mesh(path: str):
     path_to_mesh_data = f"{path}/filtered_meshes"
     # from the obj we will keep the faces
@@ -75,7 +77,7 @@ def load_pseudo_gt_mesh(path: str):
 
 
 def load_mesh(path: str, load_from_gaussians=False):
-    surface_points = None #TODO: TERRIBLE, MAKE BETTER
+    surface_points = None  # TODO: TERRIBLE, MAKE BETTER
     if path.endswith(".tet"):
         points, tet_indices = read_tet_mesh(path)
     else:
@@ -104,7 +106,7 @@ def get_volumes(tet_indices, vertex_buffer):
     return torch.stack(tet_volumes)
 
 
-def lame_from_young(E: float, nu: float):
+def lame_from_young(E, nu):
     """
     Calculate the Lame parameters from Young's modulus
     and Poisson ratio
@@ -142,6 +144,7 @@ def get_ground_truth_young(simulation_config: dict) -> (float, float):
 def save_positions(positions: torch.Tensor, filename: str) -> None:
     positions_np = np.array([p.detach().cpu().numpy() for p in positions])
     np.savez(filename, positions_np)
+
 
 def plot_histogram(data, bins=10, xlabel="Values", ylabel="Frequency", title="Histogram"):
     """

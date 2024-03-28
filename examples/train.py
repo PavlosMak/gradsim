@@ -89,11 +89,16 @@ if __name__ == "__main__":
     optimization_set = set(training_config["optimize"])
 
     initial_masses = 50 * torch.rand_like(model.particle_inv_mass)
-    physical_model = PhysicalModel(initial_mu=initial_mu,
-                                   initial_lambda=initial_lambda,
-                                   initial_velocity=initial_velocity_estimate,
-                                   initial_masses=initial_masses,
-                                   update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
+    # physical_model = PhysicalModel(initial_mu=initial_mu,
+    #                                initial_lambda=initial_lambda,
+    #                                initial_velocity=initial_velocity_estimate,
+    #                                initial_masses=initial_masses,
+    #                                update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
+    physical_model = PhysicalModelYoungPoisson(initial_E=torch.tensor(1000.0), initial_nu=torch.tensor(0.1),
+                                               initial_velocity=initial_velocity_estimate,
+                                               initial_masses=initial_masses,
+                                               update_scale_velocity=1.0, update_scale_elasticity=1.0,
+                                               update_scale_masses=1.0)
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
@@ -111,7 +116,8 @@ if __name__ == "__main__":
     positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
     np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
 
-    optimizer = initialize_optimizer(training_config, physical_model)
+    # optimizer = initialize_optimizer(training_config, physical_model)
+    optimizer = initialize_optimizer_young_poisson(training_config, physical_model)
 
     # Do one run before training to get full duration unoptimized
     with torch.no_grad():
@@ -175,10 +181,10 @@ if __name__ == "__main__":
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
                        "Mu Relative Error": mu_mape,
-                       "Mu Grad": physical_model.mu_update.grad,
+                       # "Mu Grad": physical_model.mu_update.grad,
                        "Lambda": estimated_lambda,
                        "Lambda Relative Error": lambda_mape,
-                       "Lambda Grad": physical_model.lambda_update.grad,
+                       # "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference,
                        # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
                        "LogE Abs Error": e_log_error,

@@ -4,7 +4,7 @@ import torch
 import json
 import math
 
-from examples.utils import load_mesh, save_positions, load_tet_directory, lame_from_young
+from examples.utils import load_mesh, save_positions, lame_from_young
 from gradsim import dflex as df
 
 from examples.training_utils import load_gt_positions, forward_pass
@@ -33,7 +33,7 @@ def get_nu(x, y) -> float:
 
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
-path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus_red.json"
+path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/beam_noisy.json"
 
 with open(path_to_config) as config_file:
     simulation_config = json.load(config_file)
@@ -206,7 +206,7 @@ if __name__ == '__main__':
     center_E = 25000
     center_nu = 0.25
     radius_E = 8750
-    radius_nu = 0.2
+    radius_nu = 0.1
 
     # loss = get_loss(center_mu, center_lambda)
     loss = get_loss_young_nu(center_E, center_nu)
