@@ -24,7 +24,7 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/magic-salad/registered_sliding.npz",
     "exp_name": "thinner_torus",
     "frame_count": 20,
-    "epochs": 120,
+    "epochs": 1,
     "seed": 42,
     "lr": {
       "mu": 250,

@@ -167,6 +167,8 @@ if __name__ == "__main__":
             lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
 
             estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
+            # estimated_E = 10 ** physical_model.global_E
+            estimated_nu = constraint(physical_model.global_nu, [-0.45, 0.45])
             print(f"E estimate: {estimated_E}")
             print(f"Nu estimate: {estimated_nu}")
             e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E))
@@ -191,6 +193,10 @@ if __name__ == "__main__":
                        "Nu Abs Error": nu_error})
 
         optimizer.zero_grad()
+
+    run.summary["Final E"] = estimated_E
+    run.summary["Final nu"] = estimated_nu
+    run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
     save_positions(positions, f"{output_directory}/predicted.npz")

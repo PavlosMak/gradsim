@@ -8,6 +8,21 @@ from gradsim import dflex as df
 from utils import lame_from_young
 
 
+# TODO: ADD CITATION TO PACNERF CODEBASE
+def constraint(x, bound):
+    r = bound[1] - bound[0]
+    y_scale = r / 2
+    x_scale = 2 / r
+    return y_scale * torch.tanh(x_scale * x) + (bound[0] + y_scale)
+
+
+def constraint_inv(y, bound):
+    r = bound[1] - bound[0]
+    y_scale = r / 2
+    x_scale = 2 / r
+    return torch.arctanh((y - (bound[0] + y_scale)) / y_scale) / x_scale
+
+
 class PhysicalModel(torch.nn.Module):
     def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
                  update_scale_velocity=0.1, update_scale_masses=0.1):
@@ -35,15 +50,43 @@ class PhysicalModel(torch.nn.Module):
         return out_mu, out_lambda, out_velocity, out_masses
 
 
+# class PhysicalModelYoungPoisson(torch.nn.Module):
+#     def __init__(self, initial_E, initial_nu, initial_velocity, initial_masses, update_scale_elasticity=0.1,
+#                  update_scale_velocity=0.1, update_scale_masses=0.1):
+#         super(PhysicalModelYoungPoisson, self).__init__()
+#         self.E_update = torch.nn.Parameter(torch.rand_like(initial_E) * update_scale_elasticity)
+#         self.initial_E = initial_E
+#
+#         self.initial_nu = initial_nu
+#         self.nu_update = torch.nn.Parameter(torch.tensor(0.1))
+#
+#         self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
+#         self.initial_velocity = initial_velocity
+#
+#         self.initial_masses = initial_masses
+#         self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
+#
+#     def forward(self):
+#         out_E = torch.nn.functional.relu(self.E_update + self.initial_E) + 1e-8
+#         out_nu = torch.clamp(self.nu_update + self.initial_nu, 0, 0.5)
+#
+#         out_mu, out_lambda = lame_from_young(out_E, out_nu)
+#
+#         out_velocity = self.velocity_update + self.initial_velocity
+#
+#         out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
+#
+#         return out_mu, out_lambda, out_velocity, out_masses
+
 class PhysicalModelYoungPoisson(torch.nn.Module):
     def __init__(self, initial_E, initial_nu, initial_velocity, initial_masses, update_scale_elasticity=0.1,
                  update_scale_velocity=0.1, update_scale_masses=0.1):
         super(PhysicalModelYoungPoisson, self).__init__()
+        # self.global_E = torch.nn.Parameter(torch.log10(initial_E))
         self.E_update = torch.nn.Parameter(torch.rand_like(initial_E) * update_scale_elasticity)
         self.initial_E = initial_E
-
-        self.initial_nu = initial_nu
-        self.nu_update = torch.nn.Parameter(torch.tensor(0.1))
+        self.nu_bound = [-0.45, 0.45]
+        self.global_nu = torch.nn.Parameter(constraint_inv(torch.tensor(initial_nu), self.nu_bound))
 
         self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
         self.initial_velocity = initial_velocity
@@ -52,8 +95,9 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
         self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
 
     def forward(self):
+        # out_E = 10 ** torch.nn.functional.relu(self.initial_E) + 1e-8
         out_E = torch.nn.functional.relu(self.E_update + self.initial_E) + 1e-8
-        out_nu = torch.clamp(self.nu_update + self.initial_nu, 0, 0.5)
+        out_nu = constraint(self.global_nu, self.nu_bound)
 
         out_mu, out_lambda = lame_from_young(out_E, out_nu)
 
@@ -149,9 +193,15 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
 
 
 def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
+    # param_groups = [
+    #     {'name': 'E', 'params': [model.E_update], 'lr': 500},
+    #     {'name': 'nu', 'params': [model.nu_update], 'lr': 0.0001},
+    #     {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
+    #     {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
+    # ]
     param_groups = [
         {'name': 'E', 'params': [model.E_update], 'lr': 500},
-        {'name': 'nu', 'params': [model.nu_update], 'lr': 0.0001},
+        {'name': 'nu', 'params': [model.global_nu], 'lr': 0.01},
         {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
         {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
