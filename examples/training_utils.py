@@ -144,8 +144,7 @@ def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalMod
 
 def initialize_optimizer_velocity(training_config: dict, model: PhysicalModelYoungPoisson):
     param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': training_config["lr"]["velocity"]}
-    # return torch.optim.LBFGS([param_group],line_search_fn="strong_wolfe")
-    return torch.optim.Adam([param_group])
+    return torch.optim.LBFGS([param_group])
 
 def load_gt_positions(training_config: dict):
     r = eval(training_config["gt_rotation"])

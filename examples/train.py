@@ -131,9 +131,9 @@ if __name__ == "__main__":
     velocity_optimizer = initialize_optimizer_velocity(training_config, physical_model)
     print(f"Optimizing Velocity with {velocity_epochs} epochs")
 
-    for e in range(velocity_epochs):
-        if "velocity" not in optimization_set:
-            break
+
+    def closure():
+        velocity_optimizer.zero_grad()
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
@@ -142,17 +142,21 @@ if __name__ == "__main__":
                                                                          optimization_set={"velocity"})
         loss = lossfn(positions, positions_pseudo_gt)
         loss.backward()
-        velocity_optimizer.step()
+        print(f"Loss: {loss.item()}")
+        wandb.log({"Loss": loss.item()})
+        return loss
+
+    for e in range(velocity_epochs):
+        if "velocity" not in optimization_set:
+            break
+
+        velocity_optimizer.step(closure=closure)
+
         if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
-            print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d} - Loss: {loss.item():.5f}")
-
+            print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
             print(f"Velocity estimate: {physical_model.get_velocity().data}")
-
-            wandb.log({"Loss": loss.item(),
-                       "Velocity Estimate Difference": torch.linalg.norm(physical_model.get_velocity()),
-                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(),
-                       })
-        velocity_optimizer.zero_grad()
+            wandb.log({"Velocity Estimate Difference": torch.linalg.norm(physical_model.get_velocity()),
+                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(), })
 
     epochs = training_config["epochs"]
     losses = []

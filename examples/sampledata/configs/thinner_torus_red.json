@@ -25,7 +25,7 @@
     "exp_name": "thinner_torus",
     "frame_count": 20,
     "epochs": 1,
-    "velocity_epochs": 50,
+    "velocity_epochs": 20,
     "seed": 42,
     "E": 25000,
     "nu": 0.25,
