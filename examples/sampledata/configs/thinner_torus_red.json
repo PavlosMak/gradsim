@@ -25,6 +25,7 @@
     "exp_name": "thinner_torus",
     "frame_count": 20,
     "epochs": 1,
+    "velocity_epochs": 50,
     "seed": 42,
     "E": 25000,
     "nu": 0.25,
@@ -33,7 +34,7 @@
     "lr": {
       "mu": 250,
       "lambda": 250,
-      "velocity": 0.25,
+      "velocity": 1,
       "mass": 0
     },
     "loss": {

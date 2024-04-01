@@ -33,8 +33,8 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
         self.nu_bound = [-0.45, 0.45]
         self.global_nu = torch.nn.Parameter(constraint_inv(torch.tensor(initial_nu), self.nu_bound))
 
-        self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
-        self.initial_velocity = initial_velocity
+        self.global_velocity = torch.nn.Parameter(torch.zeros(3))
+        # self.initial_velocity = initial_velocity
 
         self.initial_masses = initial_masses
         self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
@@ -46,15 +46,18 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
 
         out_mu, out_lambda = lame_from_young(out_E, out_nu)
 
-        out_velocity = self.velocity_update + self.initial_velocity
+        # out_velocity = self.global_velocity + self.initial_velocity
 
         out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
 
-        return out_mu, out_lambda, out_velocity, out_masses
+        return out_mu, out_lambda, self.global_velocity, out_masses
 
     def get_E(self):
         return torch.nn.functional.relu(self.E_update + self.initial_E) + 1e-8
 
+    def get_velocity(self):
+        # return self.global_velocity + self.initial_velocity
+        return self.global_velocity
 
 def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
     builder = df.sim.ModelBuilder()
@@ -134,11 +137,15 @@ def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalMod
     param_groups = [
         {'name': 'E', 'params': [model.E_update], 'lr': 500},
         {'name': 'nu', 'params': [model.global_nu], 'lr': 0.01},
-        {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
         {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
 
+
+def initialize_optimizer_velocity(training_config: dict, model: PhysicalModelYoungPoisson):
+    param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': training_config["lr"]["velocity"]}
+    # return torch.optim.LBFGS([param_group],line_search_fn="strong_wolfe")
+    return torch.optim.Adam([param_group])
 
 def load_gt_positions(training_config: dict):
     r = eval(training_config["gt_rotation"])

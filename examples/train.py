@@ -116,9 +116,6 @@ if __name__ == "__main__":
     positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
     np.savez(f"{output_directory}/pseudo_gt_positions.npz", positions_np)
 
-    # optimizer = initialize_optimizer(training_config, physical_model)
-    optimizer = initialize_optimizer_young_poisson(training_config, physical_model)
-
     # Do one run before training to get full duration unoptimized
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
@@ -128,12 +125,42 @@ if __name__ == "__main__":
                                                       optimization_set=optimization_set)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
+    lossfn = loss_factory(training_config)
+
+    velocity_epochs = training_config["velocity_epochs"]
+    velocity_optimizer = initialize_optimizer_velocity(training_config, physical_model)
+    print(f"Optimizing Velocity with {velocity_epochs} epochs")
+
+    for e in range(velocity_epochs):
+        if "velocity" not in optimization_set:
+            break
+        positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
+                                                                         scale, velocity, points, tet_indices, density,
+                                                                         k_mu, k_lambda, k_damp,
+                                                                         training_sim_steps, sim_dt, render_steps,
+                                                                         physical_model, fix_top_plane=fix_top_plane,
+                                                                         optimization_set={"velocity"})
+        loss = lossfn(positions, positions_pseudo_gt)
+        loss.backward()
+        velocity_optimizer.step()
+        if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
+            print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d} - Loss: {loss.item():.5f}")
+
+            print(f"Velocity estimate: {physical_model.get_velocity().data}")
+
+            wandb.log({"Loss": loss.item(),
+                       "Velocity Estimate Difference": torch.linalg.norm(physical_model.get_velocity()),
+                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(),
+                       })
+        velocity_optimizer.zero_grad()
 
     epochs = training_config["epochs"]
     losses = []
 
-    lossfn = loss_factory(training_config)
+    optimizer = initialize_optimizer_young_poisson(training_config, physical_model)
 
+    print(f"Optimizing Elasticity Parameters with {epochs} epochs")
+    optimization_set.discard("velocity")
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -171,14 +198,13 @@ if __name__ == "__main__":
                        "Nu Grad": physical_model.global_nu.grad.item(),
                        "E": estimated_E,
                        "Nu": estimated_nu
-                       # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
                        })
 
         optimizer.zero_grad()
 
     run.summary["Final E"] = physical_model.get_E()
     run.summary["Final nu"] = physical_model.global_nu.data.item()
-    run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
+    run.summary["Final Velocity"] = physical_model.get_velocity().data
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
     save_positions(positions, f"{output_directory}/predicted.npz")
