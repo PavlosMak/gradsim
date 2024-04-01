@@ -135,7 +135,7 @@ def forward_pass(position, r, scale, velocity,
 
 def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
     param_groups = [
-        {'name': 'E', 'params': [model.E_update], 'lr': 500},
+        {'name': 'E', 'params': [model.E_update], 'lr': 1000},
         {'name': 'nu', 'params': [model.global_nu], 'lr': 0.01},
         {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]

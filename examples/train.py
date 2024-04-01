@@ -164,7 +164,7 @@ if __name__ == "__main__":
     optimizer = initialize_optimizer_young_poisson(training_config, physical_model)
 
     print(f"Optimizing Elasticity Parameters with {epochs} epochs")
-    optimization_set.discard("velocity")
+    # optimization_set.discard("velocity")
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
