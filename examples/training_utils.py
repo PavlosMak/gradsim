@@ -23,61 +23,6 @@ def constraint_inv(y, bound):
     return torch.arctanh((y - (bound[0] + y_scale)) / y_scale) / x_scale
 
 
-class PhysicalModel(torch.nn.Module):
-    def __init__(self, initial_mu, initial_lambda, initial_velocity, initial_masses, update_scale_lame=0.1,
-                 update_scale_velocity=0.1, update_scale_masses=0.1):
-        super(PhysicalModel, self).__init__()
-        self.mu_update = torch.nn.Parameter(torch.rand_like(initial_mu) * update_scale_lame)
-        self.initial_mu = initial_mu
-
-        self.initial_lambda = initial_lambda
-        self.lambda_update = torch.nn.Parameter(torch.rand_like(initial_lambda) * update_scale_lame)
-
-        self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
-        self.initial_velocity = initial_velocity
-
-        self.initial_masses = initial_masses
-        self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
-
-    def forward(self):
-        out_mu = torch.nn.functional.relu(self.mu_update + self.initial_mu) + 1e-8
-        out_lambda = torch.nn.functional.relu(self.lambda_update + self.initial_lambda) + 1e-8
-
-        out_velocity = self.velocity_update + self.initial_velocity
-
-        out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
-
-        return out_mu, out_lambda, out_velocity, out_masses
-
-
-# class PhysicalModelYoungPoisson(torch.nn.Module):
-#     def __init__(self, initial_E, initial_nu, initial_velocity, initial_masses, update_scale_elasticity=0.1,
-#                  update_scale_velocity=0.1, update_scale_masses=0.1):
-#         super(PhysicalModelYoungPoisson, self).__init__()
-#         self.E_update = torch.nn.Parameter(torch.rand_like(initial_E) * update_scale_elasticity)
-#         self.initial_E = initial_E
-#
-#         self.initial_nu = initial_nu
-#         self.nu_update = torch.nn.Parameter(torch.tensor(0.1))
-#
-#         self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
-#         self.initial_velocity = initial_velocity
-#
-#         self.initial_masses = initial_masses
-#         self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
-#
-#     def forward(self):
-#         out_E = torch.nn.functional.relu(self.E_update + self.initial_E) + 1e-8
-#         out_nu = torch.clamp(self.nu_update + self.initial_nu, 0, 0.5)
-#
-#         out_mu, out_lambda = lame_from_young(out_E, out_nu)
-#
-#         out_velocity = self.velocity_update + self.initial_velocity
-#
-#         out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
-#
-#         return out_mu, out_lambda, out_velocity, out_masses
-
 class PhysicalModelYoungPoisson(torch.nn.Module):
     def __init__(self, initial_E, initial_nu, initial_velocity, initial_masses, update_scale_elasticity=0.1,
                  update_scale_velocity=0.1, update_scale_masses=0.1):
@@ -106,6 +51,9 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
         out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
 
         return out_mu, out_lambda, out_velocity, out_masses
+
+    def get_E(self):
+        return torch.nn.functional.relu(self.E_update + self.initial_E) + 1e-8
 
 
 def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
@@ -182,23 +130,7 @@ def forward_pass(position, r, scale, velocity,
     return positions, model, state, average_initial_velocity
 
 
-def initialize_optimizer(training_config: dict, model: PhysicalModel):
-    param_groups = [
-        {'name': 'mu', 'params': [model.mu_update], 'lr': training_config["lr"]["mu"]},
-        {'name': 'lambda', 'params': [model.lambda_update], 'lr': training_config["lr"]["lambda"]},
-        {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
-        {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
-    ]
-    return torch.optim.Adam(param_groups)
-
-
 def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
-    # param_groups = [
-    #     {'name': 'E', 'params': [model.E_update], 'lr': 500},
-    #     {'name': 'nu', 'params': [model.nu_update], 'lr': 0.0001},
-    #     {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
-    #     {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
-    # ]
     param_groups = [
         {'name': 'E', 'params': [model.E_update], 'lr': 500},
         {'name': 'nu', 'params': [model.global_nu], 'lr': 0.01},
@@ -232,5 +164,5 @@ def load_gt_positions(training_config: dict):
 
 def initialize_from_config(training_config, field_name, default_value):
     if field_name in training_config:
-        return eval(training_config[field_name])
+        return torch.tensor(eval(training_config[field_name]))
     return default_value

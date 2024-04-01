@@ -26,6 +26,10 @@
     "frame_count": 20,
     "epochs": 1,
     "seed": 42,
+    "E": 25000,
+    "nu": 0.25,
+    "initial_E": "1000.0",
+    "initial_nu": "0.1",
     "lr": {
       "mu": 250,
       "lambda": 250,

@@ -68,6 +68,8 @@ if __name__ == "__main__":
     gt_E, gt_nu = get_ground_truth_young(simulation_config)
     gt_E, gt_nu = torch.tensor(gt_E), torch.tensor(gt_nu)
 
+    print(f"Ground truth: \nE: {gt_E} \t nu: {gt_nu}")
+
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
     velocity = tuple(simulation_config["initial_velocity"])
@@ -83,18 +85,16 @@ if __name__ == "__main__":
     initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
     gt_mass = model.particle_inv_mass.clone()
 
-    initial_mu = initialize_from_config(training_config, "mu_initialization", torch.rand(1) * 1e3)
-    initial_lambda = initialize_from_config(training_config, "lambda_initialization", torch.rand(1) * 1e3)
+    initial_E = initialize_from_config(training_config, "initial_E", torch.tensor(1000000.0))
+    initial_nu = initialize_from_config(training_config, "initial_nu", torch.tensor(0.1))
+
+    print(f"Initialization: \nE: {initial_E.item()} \t nu: {initial_nu.item()}")
 
     optimization_set = set(training_config["optimize"])
 
     initial_masses = 50 * torch.rand_like(model.particle_inv_mass)
-    # physical_model = PhysicalModel(initial_mu=initial_mu,
-    #                                initial_lambda=initial_lambda,
-    #                                initial_velocity=initial_velocity_estimate,
-    #                                initial_masses=initial_masses,
-    #                                update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
-    physical_model = PhysicalModelYoungPoisson(initial_E=torch.tensor(1000.0), initial_nu=torch.tensor(0.1),
+
+    physical_model = PhysicalModelYoungPoisson(initial_E=initial_E, initial_nu=initial_nu,
                                                initial_velocity=initial_velocity_estimate,
                                                initial_masses=initial_masses,
                                                update_scale_velocity=1.0, update_scale_elasticity=1.0,
@@ -131,8 +131,6 @@ if __name__ == "__main__":
 
     epochs = training_config["epochs"]
     losses = []
-    mu_estimates = []
-    lambda_esimates = []
 
     lossfn = loss_factory(training_config)
 
@@ -152,22 +150,7 @@ if __name__ == "__main__":
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             losses.append(loss.item())
 
-            estimated_mu = torch.mean(model.tet_materials[:, 0])
-            estimated_lambda = torch.mean(model.tet_materials[:, 1])
-
-            mu_estimates.append(estimated_mu.item())
-            lambda_esimates.append(estimated_lambda.item())
-
-            print(f"Mu estimate: {estimated_mu}")
-            print(f"Lambda estimate: {estimated_lambda}")
-
-            mu_loss = torch.log10(estimated_mu) - torch.log10(gt_mu)
-            mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu)
-            lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
-            lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
-
-            estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
-            # estimated_E = 10 ** physical_model.global_E
+            estimated_E = physical_model.get_E()
             estimated_nu = constraint(physical_model.global_nu, [-0.45, 0.45])
             print(f"E estimate: {estimated_E}")
             print(f"Nu estimate: {estimated_nu}")
@@ -181,21 +164,20 @@ if __name__ == "__main__":
             mass_sqrd_error = torch.nn.functional.mse_loss(predicted_masses, gt_mass)
 
             wandb.log({"Loss": loss.item(),
-                       "Mu": estimated_mu,
-                       "Mu Relative Error": mu_mape,
-                       # "Mu Grad": physical_model.mu_update.grad,
-                       "Lambda": estimated_lambda,
-                       "Lambda Relative Error": lambda_mape,
-                       # "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference,
-                       # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
                        "LogE Abs Error": e_log_error,
-                       "Nu Abs Error": nu_error})
+                       "Nu Abs Error": nu_error,
+                       "E Grad": physical_model.E_update.grad.item(),
+                       "Nu Grad": physical_model.global_nu.grad.item(),
+                       "E": estimated_E,
+                       "Nu": estimated_nu
+                       # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
+                       })
 
         optimizer.zero_grad()
 
-    run.summary["Final E"] = estimated_E
-    run.summary["Final nu"] = estimated_nu
+    run.summary["Final E"] = physical_model.get_E()
+    run.summary["Final nu"] = physical_model.global_nu.data.item()
     run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
@@ -211,7 +193,3 @@ if __name__ == "__main__":
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
                                           optimization_set=optimization_set)
     save_positions(positions, f"{output_directory}/eval.npz")
-
-    # Log loss landscapes
-    wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
-    wandb_log_curve(lambda_esimates, losses, "lambda", "Loss", "Lambda Loss Landscape", id="lambda_losses")
