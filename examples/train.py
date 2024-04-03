@@ -184,6 +184,9 @@ if __name__ == "__main__":
                        "LogE Abs Error": e_log_error,
                        "Nu Abs Error": nu_error})
 
+            if e % 400 == 0:
+                torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_epoch_{e}.pth")
+
         optimizer.zero_grad()
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
@@ -203,3 +206,9 @@ if __name__ == "__main__":
     # Log loss landscapes
     wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
     wandb_log_curve(lambda_esimates, losses, "lambda", "Loss", "Lambda Loss Landscape", id="lambda_losses")
+
+
+    run.summary["Final E"] = estimated_E
+    run.summary["Final nu"] = estimated_nu
+    run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
+
