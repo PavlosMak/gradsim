@@ -16,13 +16,13 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
     "exp_name": "elastic_0",
     "frame_count": 14,
-    "epochs": 10,
+    "epochs": 50,
     "seed": 42,
     "E_initialization": "torch.tensor(316228.0)",
     "nu_initialization": "torch.tensor(0.25)",
     "lr": {
-      "mu": 250,
-      "lambda": 250,
+      "mu": 500,
+      "lambda": 1,
       "velocity": 1,
       "mass": 0
     },
@@ -32,7 +32,7 @@
       "batch_reduction": "mean"
     },
     "compare_every": 1,
-    "logging_interval": 1,
+    "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 5,
     "gt_scale": 5,
