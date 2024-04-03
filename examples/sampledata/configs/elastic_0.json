@@ -1,0 +1,43 @@
+{
+  "mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/training_mesh_decimated.obj",
+  "outdir": "",
+  "sim_duration": 2.0,
+  "sim_substeps": 100,
+  "physics_engine_rate": 24,
+  "position": [0, 0, 0],
+  "scale": 2,
+  "initial_velocity": [-0.407895, -0.5, 0.06629],
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
+  "density": 10.0,
+  "mu": 8843.973492611021,
+  "lambda": 13354.101568253574,
+  "damp": 1,
+  "training": {
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
+    "exp_name": "elastic_0",
+    "frame_count": 14,
+    "epochs": 1,
+    "seed": 42,
+    "lr": {
+      "mu": 250,
+      "lambda": 250,
+      "velocity": 0.25,
+      "mass": 0
+    },
+    "optimize": ["mu","lambda","velocity"],
+    "loss": {
+      "name": "chamfer",
+      "batch_reduction": "mean"
+    },
+    "compare_every": 1,
+    "logging_interval": 5,
+    "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
+    "sim_scale": 2,
+    "gt_scale": 2,
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/training_mesh_decimated.obj",
+    "eval_for": 40,
+    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
+    "transform_gt_points": true
+  }
+}

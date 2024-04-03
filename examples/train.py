@@ -72,6 +72,8 @@ if __name__ == "__main__":
     gt_E, gt_nu = get_ground_truth_young(simulation_config)
     gt_E, gt_nu = torch.tensor(gt_E), torch.tensor(gt_nu)
 
+    print(f"Ground truth: \n E: {gt_E}; nu: {gt_nu}")
+
     # Initialize models
     position = tuple((0, 0, 0))  # particles are already aligned with GT
     velocity = tuple(simulation_config["initial_velocity"])
@@ -87,8 +89,11 @@ if __name__ == "__main__":
     initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
     gt_mass = model.particle_inv_mass.clone()
 
-    initial_mu = initialize_from_config(training_config, "mu_initialization", torch.rand(1) * 1e3)
-    initial_lambda = initialize_from_config(training_config, "lambda_initialization", torch.rand(1) * 1e3)
+    initial_E = initialize_from_config(training_config, "E_initialization", torch.tensor(1e3))
+    initial_nu = initialize_from_config(training_config, "nu_initialization", torch.tensor(0.1))
+    initial_mu, initial_lambda = lame_from_young(initial_E, initial_nu)
+
+    print(f"Initial values: \n E: {initial_E}; nu: {initial_nu}")
 
     optimization_set = set(training_config["optimize"])
 
@@ -207,8 +212,6 @@ if __name__ == "__main__":
     wandb_log_curve(mu_estimates, losses, "mu", "Loss", "Mu Loss Landscape", id="mu_losses")
     wandb_log_curve(lambda_esimates, losses, "lambda", "Loss", "Lambda Loss Landscape", id="lambda_losses")
 
-
     run.summary["Final E"] = estimated_E
     run.summary["Final nu"] = estimated_nu
     run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
-
