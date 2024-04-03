@@ -16,17 +16,17 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
     "exp_name": "elastic_0",
     "frame_count": 14,
-    "epochs": 1500,
+    "epochs": 300,
     "seed": 42,
     "E_initialization": "torch.tensor(316228.0)",
     "nu_initialization": "torch.tensor(0.25)",
     "lr": {
       "mu": 500,
       "lambda": 1,
-      "velocity": 1,
+      "velocity": 0.25,
       "mass": 0
     },
-    "optimize": ["mu","lambda","velocity"],
+    "optimize": ["velocity"],
     "loss": {
       "name": "chamfer",
       "batch_reduction": "mean"

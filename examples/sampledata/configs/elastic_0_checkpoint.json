@@ -15,8 +15,9 @@
   "training": {
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
     "exp_name": "elastic_0",
+    "checkpoint_path": "/media/pavlos/One Touch/datasets/inverse_physics_results/fancy-eon-1077/physical_model_epoch_800.pth",
     "frame_count": 14,
-    "epochs": 1500,
+    "epochs": 1,
     "seed": 42,
     "E_initialization": "torch.tensor(316228.0)",
     "nu_initialization": "torch.tensor(0.25)",

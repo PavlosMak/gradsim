@@ -106,7 +106,8 @@ if __name__ == "__main__":
 
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
-        physical_model.load_state_dict(torch.load(f"{checkpoint_path}/physical_model.pth"))
+        print(f"Loading checkpoint: {checkpoint_path}")
+        physical_model.load_state_dict(torch.load(checkpoint_path))
 
     fix_top_plane = False
     if "fix_top_plane" in simulation_config:
