@@ -16,8 +16,7 @@ class PhysicalModel(torch.nn.Module):
         self.initial_lambda = initial_lambda
         self.lambda_update = torch.nn.Parameter(torch.rand_like(initial_lambda) * update_scale_lame)
 
-        self.velocity_update = torch.nn.Parameter(torch.rand_like(initial_velocity) * update_scale_velocity)
-        self.initial_velocity = initial_velocity
+        self.global_velocity = torch.nn.Parameter(torch.zeros(3))
 
         self.initial_masses = initial_masses
         self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
@@ -26,7 +25,7 @@ class PhysicalModel(torch.nn.Module):
         out_mu = torch.nn.functional.relu(self.mu_update + self.initial_mu) + 1e-8
         out_lambda = torch.nn.functional.relu(self.lambda_update + self.initial_lambda) + 1e-8
 
-        out_velocity = self.velocity_update + self.initial_velocity
+        out_velocity = self.global_velocity
 
         out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
 
@@ -111,10 +110,13 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
     param_groups = [
         {'name': 'mu', 'params': [model.mu_update], 'lr': training_config["lr"]["mu"]},
         {'name': 'lambda', 'params': [model.lambda_update], 'lr': training_config["lr"]["lambda"]},
-        {'name': 'velocity', 'params': [model.velocity_update], 'lr': training_config["lr"]["velocity"]},
         {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
+
+def initialize_velocity_optimizer(training_config: dict, model: PhysicalModel):
+    param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': 1}
+    return torch.optim.LBFGS([param_group])
 
 
 def load_gt_positions(training_config: dict):

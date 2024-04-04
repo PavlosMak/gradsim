@@ -137,6 +137,38 @@ if __name__ == "__main__":
 
     lossfn = loss_factory(training_config)
 
+    velocity_epochs = 10
+    velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
+
+    def closure():
+        velocity_optimizer.zero_grad()
+        positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
+                                                                         scale, velocity, points, tet_indices,
+                                                                         density,
+                                                                         k_mu, k_lambda, k_damp,
+                                                                         training_sim_steps, sim_dt, render_steps,
+                                                                         physical_model,
+                                                                         fix_top_plane=fix_top_plane,
+                                                                         optimization_set={"velocity"})
+        loss = lossfn(positions, positions_pseudo_gt)
+        loss.backward()
+        print(f"Loss: {loss.item()}")
+        wandb.log({"Loss": loss.item()})
+        return loss
+
+
+    for e in range(velocity_epochs):
+        if "velocity" not in optimization_set:
+            break
+
+        velocity_optimizer.step(closure=closure)
+
+        if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
+            print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
+            print(f"Velocity estimate: {physical_model.global_velocity.data}")
+            wandb.log({"Velocity Estimate Difference": torch.linalg.norm(physical_model.global_velocity),
+                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(), })
+
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -145,7 +177,7 @@ if __name__ == "__main__":
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
 
-        loss = lossfn(positions[:4], positions_pseudo_gt[:4])
+        loss = lossfn(positions, positions_pseudo_gt)
         loss.backward()
         optimizer.step()
 
@@ -216,4 +248,4 @@ if __name__ == "__main__":
 
     run.summary["Final E"] = estimated_E
     run.summary["Final nu"] = estimated_nu
-    run.summary["Final Velocity"] = physical_model.initial_velocity + physical_model.velocity_update
+    run.summary["Final Velocity"] = physical_model.global_velocity
