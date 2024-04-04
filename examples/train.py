@@ -137,8 +137,9 @@ if __name__ == "__main__":
 
     lossfn = loss_factory(training_config)
 
-    velocity_epochs = 10
+    velocity_epochs = training_config["velocity_epochs"]
     velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
+
 
     def closure():
         velocity_optimizer.zero_grad()
@@ -149,7 +150,7 @@ if __name__ == "__main__":
                                                                          training_sim_steps, sim_dt, render_steps,
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
-                                                                         optimization_set={"velocity"})
+                                                                         optimization_set=optimization_set)
         loss = lossfn(positions, positions_pseudo_gt)
         loss.backward()
         print(f"Loss: {loss.item()}")
@@ -248,4 +249,4 @@ if __name__ == "__main__":
 
     run.summary["Final E"] = estimated_E
     run.summary["Final nu"] = estimated_nu
-    run.summary["Final Velocity"] = physical_model.global_velocity
+    run.summary["Final Velocity"] = physical_model.global_velocity.data

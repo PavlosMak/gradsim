@@ -4,6 +4,7 @@ from tqdm import trange
 
 import math
 from gradsim import dflex as df
+from LBFGS import FullBatchLBFGS
 
 
 class PhysicalModel(torch.nn.Module):
@@ -17,9 +18,7 @@ class PhysicalModel(torch.nn.Module):
         self.lambda_update = torch.nn.Parameter(torch.rand_like(initial_lambda) * update_scale_lame)
 
         self.global_velocity = torch.nn.Parameter(torch.zeros(3))
-
-        self.initial_masses = initial_masses
-        self.mass_update = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
+        self.mass_updates = torch.nn.Parameter(torch.zeros_like(initial_masses))
 
     def forward(self):
         out_mu = torch.nn.functional.relu(self.mu_update + self.initial_mu) + 1e-8
@@ -27,7 +26,7 @@ class PhysicalModel(torch.nn.Module):
 
         out_velocity = self.global_velocity
 
-        out_masses = torch.nn.functional.relu(self.mass_update + self.initial_masses) + 1e-8
+        out_masses = torch.nn.functional.relu(self.mass_updates)
 
         return out_mu, out_lambda, out_velocity, out_masses
 
@@ -73,7 +72,7 @@ def forward_pass(position, r, scale, velocity,
         if "velocity" in optimization_set:
             model.particle_v[:, ] = velocity
         if "masses" in optimization_set:
-            model.particle_inv_mass = masses
+            model.particle_inv_mass = model.particle_inv_mass + masses
 
     average_initial_velocity = torch.mean(model.particle_v, dim=0)
 
@@ -110,14 +109,14 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
     param_groups = [
         {'name': 'mu', 'params': [model.mu_update], 'lr': training_config["lr"]["mu"]},
         {'name': 'lambda', 'params': [model.lambda_update], 'lr': training_config["lr"]["lambda"]},
-        {'name': 'mass', 'params': [model.mass_update], 'lr': training_config["lr"]["mass"]}
+        {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
+
 
 def initialize_velocity_optimizer(training_config: dict, model: PhysicalModel):
     param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': 1}
     return torch.optim.LBFGS([param_group])
-
 
 def load_gt_positions(training_config: dict):
     r = eval(training_config["gt_rotation"])
