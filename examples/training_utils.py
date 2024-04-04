@@ -4,7 +4,6 @@ from tqdm import trange
 
 import math
 from gradsim import dflex as df
-from LBFGS import FullBatchLBFGS
 
 
 class PhysicalModel(torch.nn.Module):
