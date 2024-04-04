@@ -122,6 +122,7 @@ def load_gt_positions(training_config: dict):
     path_to_gt = training_config["path_to_gt"]
     positions_pseudo_gt = np.load(path_to_gt)["arr_0"]
     edited_positions = []
+    floor_level_offset = torch.zeros(3)
     if "transform_gt_points" in training_config:
         gt_scale = training_config["gt_scale"]
         for i in range(training_config["frame_count"]):
@@ -131,12 +132,11 @@ def load_gt_positions(training_config: dict):
             edited_positions.append(frame_positions)
         positions_pseudo_gt = torch.stack(edited_positions)
         if "offset_floor" in training_config:
-            floor_level_offset = torch.zeros(3)
-            floor_level_offset[1] = torch.min(positions_pseudo_gt[:, :, 1].flatten())
-            positions_pseudo_gt -= floor_level_offset
+            floor_level_offset = torch.tensor(training_config["offset_floor"])
+            positions_pseudo_gt += floor_level_offset
     else:
         positions_pseudo_gt = torch.tensor(positions_pseudo_gt)
-    return positions_pseudo_gt
+    return positions_pseudo_gt, floor_level_offset
 
 
 def initialize_from_config(training_config, field_name, default_value):

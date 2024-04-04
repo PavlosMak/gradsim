@@ -16,7 +16,7 @@
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
     "exp_name": "elastic_0",
     "frame_count": 14,
-    "epochs": 300,
+    "epochs": 1,
     "seed": 42,
     "E_initialization": "torch.tensor(316228.0)",
     "nu_initialization": "torch.tensor(0.25)",
@@ -31,6 +31,7 @@
       "name": "chamfer",
       "batch_reduction": "mean"
     },
+    "offset_floor": [0, -0.08, 0],
     "compare_every": 1,
     "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",

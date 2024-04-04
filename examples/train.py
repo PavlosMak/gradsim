@@ -54,7 +54,7 @@ if __name__ == "__main__":
     r2 = eval(training_config["sim_mesh_rotation"])
     sim_scale = training_config["sim_scale"]
 
-    positions_pseudo_gt = load_gt_positions(training_config)
+    positions_pseudo_gt, floor_level_offset = load_gt_positions(training_config)
 
     full_frame_count = training_config["eval_for"]
     eval_sim_duration = full_frame_count / simulation_config["physics_engine_rate"]
@@ -62,6 +62,7 @@ if __name__ == "__main__":
 
     # Correct point coordinate system
     points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
+    points = points + floor_level_offset.numpy()
 
     # Log ground truth positions
     positions_np = np.array([p.detach().cpu().numpy() for p in positions_pseudo_gt])
@@ -144,7 +145,7 @@ if __name__ == "__main__":
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
 
-        loss = lossfn(positions, positions_pseudo_gt)
+        loss = lossfn(positions[:4], positions_pseudo_gt[:4])
         loss.backward()
         optimizer.step()
 
