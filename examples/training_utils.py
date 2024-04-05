@@ -4,6 +4,22 @@ from tqdm import trange
 
 import math
 from gradsim import dflex as df
+from utils import lame_from_young
+
+
+# TODO: ADD CITATION TO PACNERF CODEBASE
+def constraint(x, bound):
+    r = bound[1] - bound[0]
+    y_scale = r / 2
+    x_scale = 2 / r
+    return y_scale * torch.tanh(x_scale * x) + (bound[0] + y_scale)
+
+
+def constraint_inv(y, bound):
+    r = bound[1] - bound[0]
+    y_scale = r / 2
+    x_scale = 2 / r
+    return torch.arctanh((y - (bound[0] + y_scale)) / y_scale) / x_scale
 
 
 class PhysicalModel(torch.nn.Module):
@@ -28,6 +44,25 @@ class PhysicalModel(torch.nn.Module):
         out_masses = torch.nn.functional.relu(self.mass_updates)
 
         return out_mu, out_lambda, out_velocity, out_masses
+
+
+class PhysicalModelYoungPoisson(torch.nn.Module):
+    def __init__(self, initial_E, initial_nu, initial_masses, update_scale_masses=0.1):
+        super(PhysicalModelYoungPoisson, self).__init__()
+        self.global_E = torch.nn.Parameter(initial_E)
+
+        self.nu_bound = [-0.45, 0.45]
+        self.global_nu = torch.nn.Parameter(constraint_inv(initial_nu, self.nu_bound))
+
+        self.global_velocity = torch.nn.Parameter(torch.zeros(3))
+
+        self.initial_masses = initial_masses
+        self.mass_updates = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
+
+    def forward(self):
+        out_mu, out_lambda = lame_from_young(self.global_E, constraint(self.global_nu, self.nu_bound))
+        out_masses = torch.nn.functional.relu(self.mass_updates + self.initial_masses) + 1e-8
+        return out_mu, out_lambda, self.global_velocity, out_masses
 
 
 def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
@@ -113,10 +148,21 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
     return torch.optim.Adam(param_groups)
 
 
+def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
+    param_groups = [
+        {'name': 'E', 'params': [model.global_E], 'lr': training_config["lr"]["E"]},
+        {'name': 'nu', 'params': [model.global_nu], 'lr': training_config["lr"]["nu"]},
+        {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
+    ]
+    return torch.optim.Adam(param_groups)
+
+
 def initialize_velocity_optimizer(training_config: dict, model: PhysicalModel):
     param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': 1}
     # return torch.optim.LBFGS([param_group])
     return torch.optim.Adam([param_group])
+
+
 def load_gt_positions(training_config: dict):
     r = eval(training_config["gt_rotation"])
     path_to_gt = training_config["path_to_gt"]
