@@ -162,8 +162,21 @@ if __name__ == "__main__":
         if "velocity" not in optimization_set:
             break
 
-        velocity_optimizer.step(closure=closure)
+        velocity_optimizer.zero_grad()
+        positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
+                                                                         scale, velocity, points, tet_indices,
+                                                                         density,
+                                                                         k_mu, k_lambda, k_damp,
+                                                                         training_sim_steps, sim_dt, render_steps,
+                                                                         physical_model,
+                                                                         fix_top_plane=fix_top_plane,
+                                                                         optimization_set=optimization_set)
+        loss = lossfn(positions, positions_pseudo_gt)
+        loss.backward()
+        velocity_optimizer.step()
 
+        # velocity_optimizer.step(closure=closure)
+        #
         if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
             print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
             print(f"Velocity estimate: {physical_model.global_velocity.data}")
@@ -224,8 +237,7 @@ if __name__ == "__main__":
                        "LogE Abs Error": e_log_error,
                        "Nu Abs Error": nu_error})
 
-            if e % 400 == 0:
-                torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_epoch_{e}.pth")
+            torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_epoch_{e}.pth")
 
         optimizer.zero_grad()
 

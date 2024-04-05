@@ -115,8 +115,8 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
 
 def initialize_velocity_optimizer(training_config: dict, model: PhysicalModel):
     param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': 1}
-    return torch.optim.LBFGS([param_group])
-
+    # return torch.optim.LBFGS([param_group])
+    return torch.optim.Adam([param_group])
 def load_gt_positions(training_config: dict):
     r = eval(training_config["gt_rotation"])
     path_to_gt = training_config["path_to_gt"]
