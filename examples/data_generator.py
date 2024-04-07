@@ -19,9 +19,14 @@ if __name__ == "__main__":
     device = "cuda:0"
     with open(args.sim_config) as config_file:
         simulation_config = json.load(config_file)
+    outdir = simulation_config["outdir"]
 
     # Load simulation mesh
     points, tet_indices, _ = load_mesh(simulation_config["mesh"])
+
+    np.savez(f"{outdir}/vertices.npz", points)
+    np.savez(f"{outdir}/tets.npz", tet_indices)
+
     print(f"Running simulation with {len(points)} particles and {len(tet_indices) // 4} tetrahedra")
 
     # Get simulation configurations
@@ -51,7 +56,6 @@ if __name__ == "__main__":
                                                                          k_mu, k_lambda, k_damp,
                                                                          sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane)
     # Output results
-    outdir = simulation_config["outdir"]
     masses = model.particle_inv_mass.detach().cpu().numpy()
     np.savez(f"{outdir}/particle_inv_mass.npz", masses)
 
