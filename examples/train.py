@@ -51,6 +51,11 @@ if __name__ == "__main__":
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
+    np.savez(f"{output_directory}/vertices.npz", points)
+    np.savez(f"{output_directory}/tets.npz", tet_indices)
+
+
+
     r2 = eval(training_config["sim_mesh_rotation"])
     sim_scale = training_config["sim_scale"]
 
@@ -87,7 +92,6 @@ if __name__ == "__main__":
     model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
                           k_lambda, k_damp)
 
-    initial_velocity_estimate = sim_scale * torch.mean((positions_pseudo_gt[6] - positions_pseudo_gt[0]), dim=0) / 6
     gt_mass = model.particle_inv_mass.clone()
 
     initial_E = initialize_from_config(training_config, "E_initialization", torch.tensor(1e3))
@@ -112,6 +116,8 @@ if __name__ == "__main__":
         checkpoint_path = training_config["checkpoint_path"]
         print(f"Loading checkpoint: {checkpoint_path}")
         physical_model.load_state_dict(torch.load(checkpoint_path))
+        print(
+            f"Loaded parameter values:\n E: {10 ** physical_model.global_E};  nu: {constraint(physical_model.global_nu, [-0.45, 0.45])} ")
 
     fix_top_plane = False
     if "fix_top_plane" in simulation_config:
@@ -152,7 +158,7 @@ if __name__ == "__main__":
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-        loss = lossfn(positions, positions_pseudo_gt)
+        loss = lossfn(positions[:5], positions_pseudo_gt[:5])
         loss.backward()
         print(f"Loss: {loss.item()}")
         wandb.log({"Loss": loss.item()})
@@ -172,17 +178,23 @@ if __name__ == "__main__":
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-        loss = lossfn(positions, positions_pseudo_gt)
+        loss = lossfn(positions[:5], positions_pseudo_gt[:5])
         loss.backward()
         velocity_optimizer.step()
 
-        # velocity_optimizer.step(closure=closure)
+        #velocity_optimizer.step(closure=closure)
         #
         if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
             print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
             print(f"Velocity estimate: {physical_model.global_velocity.data}")
+            print(f"Loss: {loss.item()}")
             wandb.log({"Velocity Estimate Difference": torch.linalg.norm(physical_model.global_velocity),
-                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(), })
+                       "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(),
+                       "Mean Mass update": torch.mean(physical_model.mass_updates).item(),
+                       "Loss": loss.item()
+                       })
+
+    torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_optimized_velocity.pth")
 
     # optimizer = initialize_optimizer(training_config, physical_model)
     optimizer = initialize_optimizer_young_poisson(training_config, physical_model)

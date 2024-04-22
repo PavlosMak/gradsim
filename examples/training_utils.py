@@ -49,7 +49,7 @@ class PhysicalModel(torch.nn.Module):
 class PhysicalModelYoungPoisson(torch.nn.Module):
     def __init__(self, initial_E, initial_nu, initial_masses, update_scale_masses=0.1):
         super(PhysicalModelYoungPoisson, self).__init__()
-        self.global_E = torch.nn.Parameter(initial_E)
+        self.global_E = torch.nn.Parameter(torch.log10(initial_E))
 
         self.nu_bound = [-0.45, 0.45]
         self.global_nu = torch.nn.Parameter(constraint_inv(initial_nu, self.nu_bound))
@@ -57,10 +57,11 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
         self.global_velocity = torch.nn.Parameter(torch.zeros(3))
 
         self.initial_masses = initial_masses
-        self.mass_updates = torch.nn.Parameter(torch.rand_like(initial_masses) * update_scale_masses)
+        self.mass_updates = torch.nn.Parameter(torch.zeros_like(initial_masses))
 
     def forward(self):
-        out_mu, out_lambda = lame_from_young(self.global_E, constraint(self.global_nu, self.nu_bound))
+        out_E = 10 ** self.global_E
+        out_mu, out_lambda = lame_from_young(out_E, constraint(self.global_nu, self.nu_bound))
         out_masses = torch.nn.functional.relu(self.mass_updates + self.initial_masses) + 1e-8
         return out_mu, out_lambda, self.global_velocity, out_masses
 
@@ -71,6 +72,9 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
                           vertices=vertices, indices=tet_indices, density=density,
                           k_mu=k_mu, k_lambda=k_lambda, k_damp=k_damp)
     model = builder.finalize("cpu")
+
+    # model.gravity = torch.tensor([0.0, -98.0, 0.0])
+    model.gravity = torch.tensor([0.0, -9.8, 0.0])
 
     model.tri_ke = 0.0
     model.tri_ka = 0.0
@@ -151,16 +155,17 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
 def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
     param_groups = [
         {'name': 'E', 'params': [model.global_E], 'lr': training_config["lr"]["E"]},
-        {'name': 'nu', 'params': [model.global_nu], 'lr': training_config["lr"]["nu"]},
-        {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
+        {'name': 'nu', 'params': [model.global_nu], 'lr': training_config["lr"]["nu"]}  # ,
+        # {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
 
 
 def initialize_velocity_optimizer(training_config: dict, model: PhysicalModel):
-    param_group = {'name': 'velocity', 'params': [model.global_velocity], 'lr': 1}
-    # return torch.optim.LBFGS([param_group])
-    return torch.optim.Adam([param_group])
+    param_groups = [
+        {'name': 'velocity', 'params': [model.global_velocity], 'lr': training_config["lr"]["velocity"]}]
+    # return torch.optim.LBFGS(param_groups)
+    return torch.optim.Adam(param_groups)
 
 
 def load_gt_positions(training_config: dict):
