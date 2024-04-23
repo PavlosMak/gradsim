@@ -37,8 +37,8 @@ if __name__ == "__main__":
 
     training_frame_count = training_config["frame_count"]
     sim_dt = (1.0 / simulation_config["physics_engine_rate"]) / simulation_config["sim_substeps"]
-    training_sim_duration = training_frame_count / simulation_config["physics_engine_rate"]
-    training_sim_steps = int(training_sim_duration / sim_dt)
+
+    training_sim_steps = frames_to_sim_steps(training_frame_count, simulation_config["physics_engine_rate"], sim_dt)
 
     render_steps = simulation_config["sim_substeps"]
     path_to_exp = f"{training_config['path_to_gt']}/{training_config['exp_name']}"
@@ -54,16 +54,12 @@ if __name__ == "__main__":
     np.savez(f"{output_directory}/vertices.npz", points)
     np.savez(f"{output_directory}/tets.npz", tet_indices)
 
-
-
     r2 = eval(training_config["sim_mesh_rotation"])
     sim_scale = training_config["sim_scale"]
 
     positions_pseudo_gt, floor_level_offset = load_gt_positions(training_config)
 
-    full_frame_count = training_config["eval_for"]
-    eval_sim_duration = full_frame_count / simulation_config["physics_engine_rate"]
-    eval_sim_steps = int(eval_sim_duration / sim_dt)
+    eval_sim_steps = frames_to_sim_steps(training_config["eval_for"], simulation_config["physics_engine_rate"], sim_dt)
 
     # Correct point coordinate system
     points = sim_scale * (df.quat_to_matrix(r2) @ points.transpose(1, 0)).transpose(1, 0)
@@ -144,26 +140,26 @@ if __name__ == "__main__":
 
     lossfn = loss_factory(training_config)
 
+    velocity_sim_steps = frames_to_sim_steps(training_config["velocity_frames"],
+                                             simulation_config["physics_engine_rate"], sim_dt)
     velocity_epochs = training_config["velocity_epochs"]
     velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
 
-
-    def closure():
-        velocity_optimizer.zero_grad()
-        positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
-                                                                         scale, velocity, points, tet_indices,
-                                                                         density,
-                                                                         k_mu, k_lambda, k_damp,
-                                                                         training_sim_steps, sim_dt, render_steps,
-                                                                         physical_model,
-                                                                         fix_top_plane=fix_top_plane,
-                                                                         optimization_set=optimization_set)
-        loss = lossfn(positions[:5], positions_pseudo_gt[:5])
-        loss.backward()
-        print(f"Loss: {loss.item()}")
-        wandb.log({"Loss": loss.item()})
-        return loss
-
+    # def closure():
+    #     velocity_optimizer.zero_grad()
+    #     positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
+    #                                                                      scale, velocity, points, tet_indices,
+    #                                                                      density,
+    #                                                                      k_mu, k_lambda, k_damp,
+    #                                                                      training_sim_steps, sim_dt, render_steps,
+    #                                                                      physical_model,
+    #                                                                      fix_top_plane=fix_top_plane,
+    #                                                                      optimization_set=optimization_set)
+    #     loss = lossfn(positions[:3], positions_pseudo_gt[:3])
+    #     loss.backward()
+    #     print(f"Loss: {loss.item()}")
+    #     wandb.log({"Loss": loss.item()})
+    #     return loss
 
     for e in range(velocity_epochs):
         if "velocity" not in optimization_set:
@@ -174,15 +170,16 @@ if __name__ == "__main__":
                                                                          scale, velocity, points, tet_indices,
                                                                          density,
                                                                          k_mu, k_lambda, k_damp,
-                                                                         training_sim_steps, sim_dt, render_steps,
+                                                                         velocity_sim_steps, sim_dt, render_steps,
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-        loss = lossfn(positions[:5], positions_pseudo_gt[:5])
+        # loss = lossfn(positions[:5], positions_pseudo_gt[:5])
+        loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
         loss.backward()
         velocity_optimizer.step()
 
-        #velocity_optimizer.step(closure=closure)
+        # velocity_optimizer.step(closure=closure)
         #
         if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
             print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
@@ -234,7 +231,7 @@ if __name__ == "__main__":
             e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E))
             nu_error = torch.abs(estimated_nu - gt_nu)
 
-            velocity_estimate_difference = torch.linalg.norm(initial_velocity_estimate - average_initial_velocity)
+            velocity_estimate_difference = torch.linalg.norm(average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
 
             predicted_masses = model.particle_inv_mass

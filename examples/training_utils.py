@@ -194,3 +194,8 @@ def initialize_from_config(training_config, field_name, default_value):
     if field_name in training_config:
         return eval(training_config[field_name])
     return default_value
+
+def frames_to_sim_steps(frames, physics_engine_rate, dt):
+    sim_duration = frames / physics_engine_rate
+    sim_steps = int(sim_duration / dt)
+    return sim_steps
