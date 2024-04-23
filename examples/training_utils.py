@@ -155,8 +155,8 @@ def initialize_optimizer(training_config: dict, model: PhysicalModel):
 def initialize_optimizer_young_poisson(training_config: dict, model: PhysicalModelYoungPoisson):
     param_groups = [
         {'name': 'E', 'params': [model.global_E], 'lr': training_config["lr"]["E"]},
-        {'name': 'nu', 'params': [model.global_nu], 'lr': training_config["lr"]["nu"]}  # ,
-        # {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
+        {'name': 'nu', 'params': [model.global_nu], 'lr': training_config["lr"]["nu"]},
+        {'name': 'mass', 'params': [model.mass_updates], 'lr': training_config["lr"]["mass"]}
     ]
     return torch.optim.Adam(param_groups)
 

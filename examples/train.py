@@ -174,7 +174,6 @@ if __name__ == "__main__":
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-        # loss = lossfn(positions[:5], positions_pseudo_gt[:5])
         loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
         loss.backward()
         velocity_optimizer.step()
