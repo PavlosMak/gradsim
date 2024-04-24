@@ -25,7 +25,7 @@
     "exp_name": "elastic_0",
     "checkpoint_path": "/media/pavlos/One Touch/datasets/inverse_physics_results/sunny-snowball-1417/physical_model_optimized_velocity.pth",
     "frame_count": 14,
-    "epochs": 100,
+    "epochs": 500,
     "velocity_epochs": 0,
     "velocity_frames": 4,
     "seed": 42,
@@ -33,10 +33,15 @@
     "nu_initialization": "torch.tensor(0.25)",
     "lr": {
       "E": 0.1,
-      "nu": 0.002,
+      "nu": 0.001,
       "velocity": 0.25,
       "mass": 0.1
     },
+    "warmup_lr": {
+      "nu": 0.005,
+      "E": 0.5
+    },
+    "warmup_iters": 15,
     "optimize": [
       "velocity",
       "mu",

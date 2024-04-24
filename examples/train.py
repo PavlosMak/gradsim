@@ -194,6 +194,12 @@ if __name__ == "__main__":
 
     # optimizer = initialize_optimizer(training_config, physical_model)
     optimizer = initialize_optimizer_young_poisson(training_config, physical_model)
+    warmup_iters = training_config["warmup_iters"]
+    epochs += warmup_iters
+
+    warmup_lrs = training_config["warmup_lr"]
+    rest_lrs = training_config["lr"]
+
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -201,10 +207,24 @@ if __name__ == "__main__":
                                                                          training_sim_steps, sim_dt, render_steps,
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-
-        loss = lossfn(positions, positions_pseudo_gt)
-        loss.backward()
-        optimizer.step()
+        if e == 0:
+            print("Setting warmup LRs")
+            for param_group in optimizer.param_groups:
+                if param_group["name"] in warmup_lrs:
+                    param_group["lr"] = warmup_lrs[param_group["name"]]
+        if e == warmup_iters + 1:
+            print("Setting Rest LRs")
+            for param_group in optimizer.param_groups:
+                if param_group["name"] in rest_lrs:
+                    param_group["lr"] = rest_lrs[param_group["name"]]
+        if e <= warmup_iters:
+            loss = lossfn(positions[6:], positions_pseudo_gt[6:])
+            loss.backward()
+            optimizer.step()
+        else:
+            loss = lossfn(positions, positions_pseudo_gt)
+            loss.backward()
+            optimizer.step()
 
         if (e % training_config["logging_interval"] == 0 or e == epochs - 1):
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
