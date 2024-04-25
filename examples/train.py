@@ -286,6 +286,9 @@ if __name__ == "__main__":
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
                                           optimization_set=optimization_set)
+    total_error = lossfn(positions[:len(positions_pseudo_gt)], positions_pseudo_gt)
+    print(f"Evaluation Error: {total_error}")
+    run.summary["Evaluation Error"] = total_error
     save_positions(positions, f"{output_directory}/eval.npz")
 
     # Log loss landscapes

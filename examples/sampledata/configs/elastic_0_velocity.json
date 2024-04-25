@@ -23,14 +23,13 @@
   "training": {
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
     "exp_name": "elastic_0",
-    "checkpoint_path": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/poisson_reconstructed_rescaled.obj",
     "frame_count": 14,
-    "epochs": 1200,
-    "velocity_epochs": 0,
+    "epochs": 0,
+    "velocity_epochs": 50,
     "velocity_frames": 4,
     "seed": 42,
-    "E_initialization": "torch.tensor(316228)",
-    "nu_initialization": "torch.tensor(0.25)",
+    "E_initialization": "torch.tensor(23008.377696598774)",
+    "nu_initialization": "torch.tensor(0.30079413488868173)",
     "lr": {
       "E": 0.1,
       "nu": 0.001,
@@ -41,7 +40,7 @@
       "nu": 0.005,
       "E": 0.1
     },
-    "warmup_iters": 15,
+    "warmup_iters": 0,
     "optimize": [
       "velocity",
       "mu",
@@ -61,7 +60,7 @@
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 1,
     "gt_scale": 1,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/poisson_reconstructed.obj",
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/poisson_reconstructed_rescaled.obj",
     "eval_for": 14,
     "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
     "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
