@@ -28,6 +28,7 @@
     "epochs": 1200,
     "velocity_epochs": 0,
     "velocity_frames": 4,
+    "warmup_start_frame": 6,
     "seed": 42,
     "E_initialization": "torch.tensor(316228)",
     "nu_initialization": "torch.tensor(0.25)",

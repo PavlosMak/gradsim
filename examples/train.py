@@ -199,6 +199,7 @@ if __name__ == "__main__":
 
     warmup_lrs = training_config["warmup_lr"]
     rest_lrs = training_config["lr"]
+    warmup_start_frame = training_config["warmup_start_frame"]
 
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
@@ -218,7 +219,7 @@ if __name__ == "__main__":
                 if param_group["name"] in rest_lrs:
                     param_group["lr"] = rest_lrs[param_group["name"]]
         if e <= warmup_iters:
-            loss = lossfn(positions[6:], positions_pseudo_gt[6:])
+            loss = lossfn(positions[warmup_start_frame:], positions_pseudo_gt[warmup_start_frame:])
             loss.backward()
             optimizer.step()
         else:
