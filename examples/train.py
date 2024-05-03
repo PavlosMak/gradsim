@@ -208,7 +208,7 @@ if __name__ == "__main__":
                                                                          training_sim_steps, sim_dt, render_steps,
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set)
-        if e == 0:
+        if e == 0 and warmup_iters > 0:
             print("Setting warmup LRs")
             for param_group in optimizer.param_groups:
                 if param_group["name"] in warmup_lrs:
