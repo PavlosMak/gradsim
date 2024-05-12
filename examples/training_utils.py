@@ -73,7 +73,6 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
                           k_mu=k_mu, k_lambda=k_lambda, k_damp=k_damp)
     model = builder.finalize("cpu")
 
-    # model.gravity = torch.tensor([0.0, -98.0, 0.0])
     model.gravity = torch.tensor([0.0, -9.8, 0.0])
 
     model.tri_ke = 0.0
@@ -81,12 +80,17 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
     model.tri_kd = 0.0
     model.tri_kb = 0.0
 
-    model.contact_ke = 1.0e4
-    model.contact_kd = 1.0
-    model.contact_kf = 10.0
-    model.contact_mu = 0.5
+    model.contact_distance = 0.01
+    model.contact_ke = 500  # original 1e+3
+    model.contact_kd = 0.0  # original 0.0
+    model.contact_kf = 1e3   # original 1e+3
+    model.contact_mu = 0.5  # original 0.5 - works best.
 
-    model.particle_radius = 0.05
+    # model.contact_ke = 1000.0    # affects force in the direction of the normal
+    # model.contact_kd = 1.0       # scales the normal essentially, and then is added as a force, if the velocity on the normal is negative.
+    # model.contact_kf = 10000.0    # multiplies the tangent (x-z plane) force and is applied as a friction force
+    # model.contact_mu = 0.9   # defines the lower threshold where friction forces are applied
+
     model.ground = True
 
     return model
@@ -194,6 +198,7 @@ def initialize_from_config(training_config, field_name, default_value):
     if field_name in training_config:
         return eval(training_config[field_name])
     return default_value
+
 
 def frames_to_sim_steps(frames, physics_engine_rate, dt):
     sim_duration = frames / physics_engine_rate

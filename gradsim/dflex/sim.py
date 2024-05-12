@@ -37,7 +37,7 @@ from . import config
 from .model import *
 
 # Todo
-#-----
+# -----
 #
 # [x] Spring model
 # [x] 2D FEM model
@@ -61,16 +61,15 @@ from .model import *
 # externally compiled kernels module (C++/CUDA code with PyBind entry points)
 kernels = None
 
+
 @df.func
 def test(c: float):
-
     x = 1.0
 
     if (c < 3.0):
         x = 2.0
 
-    return x*6.0
-
+    return x * 6.0
 
 
 def kernel_init():
@@ -101,7 +100,6 @@ def integrate_particles(x: df.tensor(df.float3),
                         dt: float,
                         x_new: df.tensor(df.float3),
                         v_new: df.tensor(df.float3)):
-
     tid = df.tid()
 
     x0 = df.load(x, tid)
@@ -135,7 +133,6 @@ def integrate_rigids(rigid_x: df.tensor(df.float3),
                      rigid_r_new: df.tensor(df.quat),
                      rigid_v_new: df.tensor(df.float3),
                      rigid_w_new: df.tensor(df.float3)):
-
     tid = df.tid()
 
     # positions
@@ -144,33 +141,33 @@ def integrate_rigids(rigid_x: df.tensor(df.float3),
 
     # velocities
     v0 = df.load(rigid_v, tid)
-    w0 = df.load(rigid_w, tid)         # angular velocity
+    w0 = df.load(rigid_w, tid)  # angular velocity
 
     # forces
     f0 = df.load(rigid_f, tid)
     t0 = df.load(rigid_t, tid)
 
     # masses
-    inv_mass = df.load(inv_m, tid)     # 1 / mass
+    inv_mass = df.load(inv_m, tid)  # 1 / mass
     inv_inertia = df.load(inv_I, tid)  # inverse of 3x3 inertia matrix
 
     g = df.load(gravity, 0)
 
     # linear part
-    v1 = v0 + (f0 * inv_mass + g * df.nonzero(inv_mass)) * dt           # linear integral (linear position/velocity)
+    v1 = v0 + (f0 * inv_mass + g * df.nonzero(inv_mass)) * dt  # linear integral (linear position/velocity)
     x1 = x0 + v1 * dt
 
     # angular part
 
     # so reverse multiplication by r0 takes you from global coordinates into local coordinates
     # because it's covector and thus gets pulled back rather than pushed forward
-    wb = df.rotate_inv(r0, w0)         # angular integral (angular velocity and rotation), rotate into object reference frame
-    tb = df.rotate_inv(r0, t0)         # also rotate torques into local coordinates
+    wb = df.rotate_inv(r0, w0)  # angular integral (angular velocity and rotation), rotate into object reference frame
+    tb = df.rotate_inv(r0, t0)  # also rotate torques into local coordinates
 
     # I^{-1} torque = angular acceleration and inv_inertia is always going to be in the object frame.
     # So we need to rotate into that frame, and then back into global.
-    w1 = df.rotate(r0, wb + inv_inertia * tb * dt)                   # I^-1 * torque * dt., then go back into global coordinates
-    r1 = df.normalize(r0 + df.quat(w1, 0.0) * r0 * 0.5 * dt)         # rotate around w1 by dt
+    w1 = df.rotate(r0, wb + inv_inertia * tb * dt)  # I^-1 * torque * dt., then go back into global coordinates
+    r1 = df.normalize(r0 + df.quat(w1, 0.0) * r0 * 0.5 * dt)  # rotate around w1 by dt
 
     df.store(rigid_x_new, tid, x1)
     df.store(rigid_r_new, tid, r1)
@@ -186,7 +183,6 @@ def eval_springs(x: df.tensor(df.float3),
                  spring_stiffness: df.tensor(float),
                  spring_damping: df.tensor(float),
                  f: df.tensor(df.float3)):
-
     tid = df.tid()
 
     i = df.load(spring_indices, tid * 2 + 0)
@@ -239,20 +235,20 @@ def eval_triangles(x: df.tensor(df.float3),
     j = df.load(indices, tid * 3 + 1)
     k = df.load(indices, tid * 3 + 2)
 
-    p = df.load(x, i)        # point zero
-    q = df.load(x, j)        # point one
-    r = df.load(x, k)        # point two
+    p = df.load(x, i)  # point zero
+    q = df.load(x, j)  # point one
+    r = df.load(x, k)  # point two
 
-    vp = df.load(v, i)       # vel zero
-    vq = df.load(v, j)       # vel one
-    vr = df.load(v, k)       # vel two
+    vp = df.load(v, i)  # vel zero
+    vq = df.load(v, j)  # vel one
+    vr = df.load(v, k)  # vel two
 
-    qp = q - p     # barycentric coordinates (centered at p)
+    qp = q - p  # barycentric coordinates (centered at p)
     rp = r - p
 
     Dm = df.load(pose, tid)
 
-    inv_rest_area = df.determinant(Dm) * 2.0     # 1 / det(A) = det(A^-1)
+    inv_rest_area = df.determinant(Dm) * 2.0  # 1 / det(A) = det(A^-1)
     rest_area = 1.0 / inv_rest_area
 
     # scale stiffness coefficients to account for area
@@ -264,7 +260,7 @@ def eval_triangles(x: df.tensor(df.float3),
     f1 = qp * Dm[0, 0] + rp * Dm[1, 0]
     f2 = qp * Dm[0, 1] + rp * Dm[1, 1]
 
-    #-----------------------------
+    # -----------------------------
     # St. Venant-Kirchoff
 
     # # Green strain, F'*F-I
@@ -284,7 +280,7 @@ def eval_triangles(x: df.tensor(df.float3),
     # fr = (f1*T[0,1] + f2*T[1,1])*k_mu*2.0
     # alpha = 1.0
 
-    #-----------------------------
+    # -----------------------------
     # Baraff & Witkin, note this model is not isotropic
 
     # c1 = length(f1) - 1.0
@@ -295,7 +291,7 @@ def eval_triangles(x: df.tensor(df.float3),
     # fq = f1*Dm[0,0] + f2*Dm[0,1]
     # fr = f1*Dm[1,0] + f2*Dm[1,1]
 
-    #-----------------------------
+    # -----------------------------
     # Neo-Hookean (with rest stability)
 
     # force = mu*F*Dm'
@@ -303,7 +299,7 @@ def eval_triangles(x: df.tensor(df.float3),
     fr = (f1 * Dm[1, 0] + f2 * Dm[1, 1]) * k_mu
     alpha = 1.0 + k_mu / k_lambda
 
-    #-----------------------------
+    # -----------------------------
     # Area Preservation
 
     n = df.cross(qp, rp)
@@ -322,7 +318,7 @@ def eval_triangles(x: df.tensor(df.float3),
 
     f_area = k_lambda * c
 
-    #-----------------------------
+    # -----------------------------
     # Area Damping
 
     dcdt = dot(dcdq, vq) + dot(dcdr, vr) - dot(dcdq + dcdr, vp)
@@ -332,7 +328,7 @@ def eval_triangles(x: df.tensor(df.float3),
     fr = fr + dcdr * (f_area + f_damp)
     fp = fq + fr
 
-    #-----------------------------
+    # -----------------------------
     # Lift + Drag
 
     vmid = (vp + vr + vq) * 0.3333
@@ -350,6 +346,7 @@ def eval_triangles(x: df.tensor(df.float3),
     df.atomic_add(f, i, fp)
     df.atomic_sub(f, j, fq)
     df.atomic_sub(f, k, fr)
+
 
 @df.func
 def triangle_closest_point_barycentric(a: df.float3, b: df.float3, c: df.float3, p: df.float3):
@@ -397,6 +394,7 @@ def triangle_closest_point_barycentric(a: df.float3, b: df.float3, c: df.float3,
     w = vc * denom
 
     return float3(1.0 - v - w, v, w)
+
 
 # @df.func
 # def triangle_closest_point(a: df.float3, b: df.float3, c: df.float3, p: df.float3):
@@ -448,27 +446,26 @@ def triangle_closest_point_barycentric(a: df.float3, b: df.float3, c: df.float3,
 
 @df.kernel
 def eval_triangles_contact(
-                                       # idx : df.tensor(int), # list of indices for colliding particles
-    num_particles: int,                # size of particles
-    x: df.tensor(df.float3),
-    v: df.tensor(df.float3),
-    indices: df.tensor(int),
-    pose: df.tensor(df.mat22),
-    activation: df.tensor(float),
-    k_mu: float,
-    k_lambda: float,
-    k_damp: float,
-    k_drag: float,
-    k_lift: float,
-    f: df.tensor(df.float3)):
-
+        # idx : df.tensor(int), # list of indices for colliding particles
+        num_particles: int,  # size of particles
+        x: df.tensor(df.float3),
+        v: df.tensor(df.float3),
+        indices: df.tensor(int),
+        pose: df.tensor(df.mat22),
+        activation: df.tensor(float),
+        k_mu: float,
+        k_lambda: float,
+        k_damp: float,
+        k_drag: float,
+        k_lift: float,
+        f: df.tensor(df.float3)):
     tid = df.tid()
-    face_no = tid // num_particles     # which face
+    face_no = tid // num_particles  # which face
     particle_no = tid % num_particles  # which particle
 
     # index = df.load(idx, tid)
-    pos = df.load(x, particle_no)      # at the moment, just one particle
-                                       # vel0 = df.load(v, 0)
+    pos = df.load(x, particle_no)  # at the moment, just one particle
+    # vel0 = df.load(v, 0)
 
     i = df.load(indices, face_no * 3 + 0)
     j = df.load(indices, face_no * 3 + 1)
@@ -477,9 +474,9 @@ def eval_triangles_contact(
     if (i == particle_no or j == particle_no or k == particle_no):
         return
 
-    p = df.load(x, i)        # point zero
-    q = df.load(x, j)        # point one
-    r = df.load(x, k)        # point two
+    p = df.load(x, i)  # point zero
+    q = df.load(x, j)  # point one
+    r = df.load(x, k)  # point two
 
     # vp = df.load(v, i) # vel zero
     # vq = df.load(v, j) # vel one
@@ -494,8 +491,8 @@ def eval_triangles_contact(
     diff = pos - closest
     dist = df.dot(diff, diff)
     n = df.normalize(diff)
-    c = df.min(dist - 0.01, 0.0)       # 0 unless within 0.01 of surface
-                                       #c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
+    c = df.min(dist - 0.01, 0.0)  # 0 unless within 0.01 of surface
+    # c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
     fn = n * c * 1e5
 
     df.atomic_sub(f, particle_no, fn)
@@ -508,26 +505,25 @@ def eval_triangles_contact(
 
 @df.kernel
 def eval_triangles_rigid_contacts(
-    num_particles: int,                          # number of particles (size of contact_point)
-    x: df.tensor(df.float3),                     # position of particles
-    v: df.tensor(df.float3),
-    indices: df.tensor(int),                     # triangle indices
-    rigid_x: df.tensor(df.float3),               # rigid body positions
-    rigid_r: df.tensor(df.quat),
-    rigid_v: df.tensor(df.float3),
-    rigid_w: df.tensor(df.float3),
-    contact_body: df.tensor(int),
-    contact_point: df.tensor(df.float3),         # position of contact points relative to body
-    contact_dist: df.tensor(float),
-    contact_mat: df.tensor(int),
-    materials: df.tensor(float),
-                                                 #   rigid_f : df.tensor(df.float3),
-                                                 #   rigid_t : df.tensor(df.float3),
-    tri_f: df.tensor(df.float3)):
-
+        num_particles: int,  # number of particles (size of contact_point)
+        x: df.tensor(df.float3),  # position of particles
+        v: df.tensor(df.float3),
+        indices: df.tensor(int),  # triangle indices
+        rigid_x: df.tensor(df.float3),  # rigid body positions
+        rigid_r: df.tensor(df.quat),
+        rigid_v: df.tensor(df.float3),
+        rigid_w: df.tensor(df.float3),
+        contact_body: df.tensor(int),
+        contact_point: df.tensor(df.float3),  # position of contact points relative to body
+        contact_dist: df.tensor(float),
+        contact_mat: df.tensor(int),
+        materials: df.tensor(float),
+        #   rigid_f : df.tensor(df.float3),
+        #   rigid_t : df.tensor(df.float3),
+        tri_f: df.tensor(df.float3)):
     tid = df.tid()
 
-    face_no = tid // num_particles     # which face
+    face_no = tid // num_particles  # which face
     particle_no = tid % num_particles  # which particle
 
     # -----------------------
@@ -538,13 +534,13 @@ def eval_triangles_rigid_contacts(
     c_mat = df.load(contact_mat, particle_no)
 
     # hard coded surface parameter tensor layout (ke, kd, kf, mu)
-    ke = df.load(materials, c_mat * 4 + 0)       # restitution coefficient
-    kd = df.load(materials, c_mat * 4 + 1)       # damping coefficient
-    kf = df.load(materials, c_mat * 4 + 2)       # friction coefficient
-    mu = df.load(materials, c_mat * 4 + 3)       # coulomb friction
+    ke = df.load(materials, c_mat * 4 + 0)  # restitution coefficient
+    kd = df.load(materials, c_mat * 4 + 1)  # damping coefficient
+    kf = df.load(materials, c_mat * 4 + 2)  # friction coefficient
+    mu = df.load(materials, c_mat * 4 + 3)  # coulomb friction
 
-    x0 = df.load(rigid_x, c_body)      # position of colliding body
-    r0 = df.load(rigid_r, c_body)      # orientation of colliding body
+    x0 = df.load(rigid_x, c_body)  # position of colliding body
+    r0 = df.load(rigid_r, c_body)  # orientation of colliding body
 
     v0 = df.load(rigid_v, c_body)
     w0 = df.load(rigid_w, c_body)
@@ -554,12 +550,12 @@ def eval_triangles_rigid_contacts(
     # use x0 as center, everything is offset from center of mass
 
     # moment arm
-    r = pos - x0                       # basically just c_point in the new coordinates
+    r = pos - x0  # basically just c_point in the new coordinates
     rhat = df.normalize(r)
-    pos = pos + rhat * c_dist          # add on 'thickness' of shape, e.g.: radius of sphere/capsule
+    pos = pos + rhat * c_dist  # add on 'thickness' of shape, e.g.: radius of sphere/capsule
 
     # contact point velocity
-    dpdt = v0 + df.cross(w0, r)        # this is rigid velocity cross offset, so it's the velocity of the contact point.
+    dpdt = v0 + df.cross(w0, r)  # this is rigid velocity cross offset, so it's the velocity of the contact point.
 
     # -----------------------
     # load triangle
@@ -567,51 +563,51 @@ def eval_triangles_rigid_contacts(
     j = df.load(indices, face_no * 3 + 1)
     k = df.load(indices, face_no * 3 + 2)
 
-    p = df.load(x, i)        # point zero
-    q = df.load(x, j)        # point one
-    r = df.load(x, k)        # point two
+    p = df.load(x, i)  # point zero
+    q = df.load(x, j)  # point one
+    r = df.load(x, k)  # point two
 
-    vp = df.load(v, i)       # vel zero
-    vq = df.load(v, j)       # vel one
-    vr = df.load(v, k)       # vel two
+    vp = df.load(v, i)  # vel zero
+    vq = df.load(v, j)  # vel one
+    vr = df.load(v, k)  # vel two
 
     bary = triangle_closest_point_barycentric(p, q, r, pos)
     closest = p * bary[0] + q * bary[1] + r * bary[2]
 
-    diff = pos - closest               # vector from tri to point
-    dist = df.dot(diff, diff)          # squared distance
-    n = df.normalize(diff)             # points into the object
-    c = df.min(dist - 0.05, 0.0)       # 0 unless within 0.05 of surface
-                                       #c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
-                                       # fn = n * c * 1e6    # points towards cloth (both n and c are negative)
+    diff = pos - closest  # vector from tri to point
+    dist = df.dot(diff, diff)  # squared distance
+    n = df.normalize(diff)  # points into the object
+    c = df.min(dist - 0.05, 0.0)  # 0 unless within 0.05 of surface
+    # c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
+    # fn = n * c * 1e6    # points towards cloth (both n and c are negative)
 
     # df.atomic_sub(tri_f, particle_no, fn)
 
-    fn = c * ke    # normal force (restitution coefficient * how far inside for ground) (negative)
+    fn = c * ke  # normal force (restitution coefficient * how far inside for ground) (negative)
 
-    vtri = vp * bary[0] + vq * bary[1] + vr * bary[2]         # bad approximation for centroid velocity
+    vtri = vp * bary[0] + vq * bary[1] + vr * bary[2]  # bad approximation for centroid velocity
     vrel = vtri - dpdt
 
-    vn = dot(n, vrel)        # velocity component of rigid in negative normal direction
-    vt = vrel - n * vn       # velocity component not in normal direction
+    vn = dot(n, vrel)  # velocity component of rigid in negative normal direction
+    vt = vrel - n * vn  # velocity component not in normal direction
 
     # contact damping
-    fd = 0.0 - df.max(vn, 0.0) * kd * df.step(c)           # again, negative, into the ground
+    fd = 0.0 - df.max(vn, 0.0) * kd * df.step(c)  # again, negative, into the ground
 
     # # viscous friction
     # ft = vt*kf
 
     # Coulomb friction (box)
     lower = mu * (fn + fd)
-    upper = 0.0 - lower      # workaround because no unary ops yet
+    upper = 0.0 - lower  # workaround because no unary ops yet
 
-    nx = cross(n, float3(0.0, 0.0, 1.0))         # basis vectors for tangent
+    nx = cross(n, float3(0.0, 0.0, 1.0))  # basis vectors for tangent
     nz = cross(n, float3(1.0, 0.0, 0.0))
 
     vx = df.clamp(dot(nx * kf, vt), lower, upper)
     vz = df.clamp(dot(nz * kf, vt), lower, upper)
 
-    ft = (nx * vx + nz * vz) * (0.0 - df.step(c))          # df.float3(vx, 0.0, vz)*df.step(c)
+    ft = (nx * vx + nz * vz) * (0.0 - df.step(c))  # df.float3(vx, 0.0, vz)*df.step(c)
 
     # # Coulomb friction (smooth, but gradients are numerically unstable around |vt| = 0)
     # #ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke)
@@ -625,8 +621,8 @@ def eval_triangles_rigid_contacts(
 
 @df.kernel
 def eval_bending(
-    x: df.tensor(df.float3), v: df.tensor(df.float3), indices: df.tensor(int), rest: df.tensor(float), ke: float, kd: float, f: df.tensor(df.float3)):
-
+        x: df.tensor(df.float3), v: df.tensor(df.float3), indices: df.tensor(int), rest: df.tensor(float), ke: float,
+        kd: float, f: df.tensor(df.float3)):
     tid = df.tid()
 
     i = df.load(indices, tid * 4 + 0)
@@ -646,8 +642,8 @@ def eval_bending(
     v3 = df.load(v, k)
     v4 = df.load(v, l)
 
-    n1 = df.cross(x3 - x1, x4 - x1)    # normal to face 1
-    n2 = df.cross(x4 - x2, x3 - x2)    # normal to face 2
+    n1 = df.cross(x3 - x1, x4 - x1)  # normal to face 1
+    n2 = df.cross(x4 - x2, x3 - x2)  # normal to face 2
 
     n1_length = df.length(n1)
     n2_length = df.length(n2)
@@ -695,7 +691,6 @@ def eval_tetrahedra(x: df.tensor(df.float3),
                     activation: df.tensor(float),
                     materials: df.tensor(float),
                     f: df.tensor(df.float3)):
-
     tid = df.tid()
 
     i = df.load(indices, tid * 4 + 0)
@@ -744,7 +739,7 @@ def eval_tetrahedra(x: df.tensor(df.float3),
     F = Ds * Dm
     dFdt = df.mat33(v10, v20, v30) * Dm
 
-    #-----------------------------
+    # -----------------------------
     # Neo-Hookean (with rest stability [Smith et al 2018])
     Ic = F[0, 0] * F[0, 0] + F[1, 1] * F[1, 1] + F[2, 2] * F[2, 2]
 
@@ -759,7 +754,7 @@ def eval_tetrahedra(x: df.tensor(df.float3),
     # hydrostatic part
     J = df.determinant(F)
 
-    #print(J)
+    # print(J)
     s = inv_rest_volume / 6.0
     dJdx1 = df.cross(x20, x30) * s
     dJdx2 = df.cross(x30, x10) * s
@@ -783,20 +778,21 @@ def eval_tetrahedra(x: df.tensor(df.float3),
 
 
 @df.kernel
-def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, kd: float, kf: float, mu: float, f: df.tensor(df.float3)):
-
-    tid = df.tid()           # this just handles contact of particles with the ground plane, nothing else.
+def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, kd: float, kf: float, mu: float,
+                  f: df.tensor(df.float3)):
+    tid = df.tid()  # this just handles contact of particles with the ground plane, nothing else.
 
     x0 = df.load(x, tid)
     v0 = df.load(v, tid)
 
-    n = float3(0.0, 1.0, 0.0)          # why is the normal always y? Ground is always (0, 1, 0) normal
+    n = float3(0.0, 1.0, 0.0)  # why is the normal always y? Ground is always (0, 1, 0) normal
 
-    c = df.min(dot(n, x0) - 0.01, 0.0)           # 0 unless within 0.01 of surface
-                                                 #c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
+    c = df.min(dot(n, x0) - 0.01, 0.0)  # 0 unless within 0.01 of surface
+    # c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
 
     vn = dot(n, v0)
-    vt = v0 - n * vn
+    # vt = v0 - n * df.min(dot(n, v0), 0.0)  # PACNERF
+    vt = v0 - n * vn # ORIGINAL
 
     fn = n * c * ke
 
@@ -804,7 +800,7 @@ def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, k
     fd = n * df.min(vn, 0.0) * kd
 
     # viscous friction
-    #ft = vt*kf
+    # ft = vt*kf
 
     # Coulomb friction (box)
     lower = mu * c * ke
@@ -816,9 +812,9 @@ def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, k
     ft = df.float3(vx, 0.0, vz)
 
     # Coulomb friction (smooth, but gradients are numerically unstable around |vt| = 0)
-    #ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke)
+    # ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke) #originally commented
 
-    ftotal = fn + (fd + ft) * df.step(c)
+    ftotal = fn + (fd + ft) * df.step(c) # Original
 
     df.atomic_sub(f, tid, ftotal)
 
@@ -835,7 +831,6 @@ def eval_rigid_contacts(rigid_x: df.tensor(df.float3),
                         materials: df.tensor(float),
                         rigid_f: df.tensor(df.float3),
                         rigid_t: df.tensor(df.float3)):
-
     tid = df.tid()
 
     c_body = df.load(contact_body, tid)
@@ -844,13 +839,13 @@ def eval_rigid_contacts(rigid_x: df.tensor(df.float3),
     c_mat = df.load(contact_mat, tid)
 
     # hard coded surface parameter tensor layout (ke, kd, kf, mu)
-    ke = df.load(materials, c_mat * 4 + 0)       # restitution coefficient
-    kd = df.load(materials, c_mat * 4 + 1)       # damping coefficient
-    kf = df.load(materials, c_mat * 4 + 2)       # friction coefficient
-    mu = df.load(materials, c_mat * 4 + 3)       # coulomb friction
+    ke = df.load(materials, c_mat * 4 + 0)  # restitution coefficient
+    kd = df.load(materials, c_mat * 4 + 1)  # damping coefficient
+    kf = df.load(materials, c_mat * 4 + 2)  # friction coefficient
+    mu = df.load(materials, c_mat * 4 + 3)  # coulomb friction
 
-    x0 = df.load(rigid_x, c_body)      # position of colliding body
-    r0 = df.load(rigid_r, c_body)      # orientation of colliding body
+    x0 = df.load(rigid_x, c_body)  # position of colliding body
+    r0 = df.load(rigid_r, c_body)  # orientation of colliding body
 
     v0 = df.load(rigid_v, c_body)
     w0 = df.load(rigid_w, c_body)
@@ -858,32 +853,32 @@ def eval_rigid_contacts(rigid_x: df.tensor(df.float3),
     n = float3(0.0, 1.0, 0.0)
 
     # transform point to world space
-    p = x0 + df.rotate(r0, c_point) - n * c_dist           # add on 'thickness' of shape, e.g.: radius of sphere/capsule
-                                                           # use x0 as center, everything is offset from center of mass
+    p = x0 + df.rotate(r0, c_point) - n * c_dist  # add on 'thickness' of shape, e.g.: radius of sphere/capsule
+    # use x0 as center, everything is offset from center of mass
 
     # moment arm
-    r = p - x0     # basically just c_point in the new coordinates
+    r = p - x0  # basically just c_point in the new coordinates
 
     # contact point velocity
-    dpdt = v0 + df.cross(w0, r)        # this is rigid velocity cross offset, so it's the velocity of the contact point.
+    dpdt = v0 + df.cross(w0, r)  # this is rigid velocity cross offset, so it's the velocity of the contact point.
 
     # check ground contact
-    c = df.min(dot(n, p), 0.0)         # check if we're inside the ground
+    c = df.min(dot(n, p), 0.0)  # check if we're inside the ground
 
-    vn = dot(n, dpdt)        # velocity component out of the ground
-    vt = dpdt - n * vn       # velocity component not into the ground
+    vn = dot(n, dpdt)  # velocity component out of the ground
+    vt = dpdt - n * vn  # velocity component not into the ground
 
-    fn = c * ke    # nprmal force (restitution coefficient * how far inside for ground)
+    fn = c * ke  # nprmal force (restitution coefficient * how far inside for ground)
 
     # contact damping
-    fd = df.min(vn, 0.0) * kd * df.step(c)       # again, velocity into the ground, negative
+    fd = df.min(vn, 0.0) * kd * df.step(c)  # again, velocity into the ground, negative
 
     # viscous friction
-    #ft = vt*kf
+    # ft = vt*kf
 
     # Coulomb friction (box)
-    lower = mu * (fn + fd)   # negative
-    upper = 0.0 - lower      # positive, workaround for no unary ops
+    lower = mu * (fn + fd)  # negative
+    upper = 0.0 - lower  # positive, workaround for no unary ops
 
     vx = df.clamp(dot(float3(kf, 0.0, 0.0), vt), lower, upper)
     vz = df.clamp(dot(float3(0.0, 0.0, kf), vt), lower, upper)
@@ -891,7 +886,7 @@ def eval_rigid_contacts(rigid_x: df.tensor(df.float3),
     ft = df.float3(vx, 0.0, vz) * df.step(c)
 
     # Coulomb friction (smooth, but gradients are numerically unstable around |vt| = 0)
-    #ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke)
+    # ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke)
 
     f_total = n * (fn + fd) + ft
     t_total = df.cross(r, f_total)
@@ -903,30 +898,25 @@ def eval_rigid_contacts(rigid_x: df.tensor(df.float3),
 # compute transform across a joint
 @df.func
 def jcalc_transform(type: int, axis: df.float3, joint_q: df.tensor(float), start: int):
-
     # prismatic
     if (type == 0):
-
         q = df.load(joint_q, start)
         X_jc = spatial_transform(axis * q, quat_identity())
         return X_jc
 
     # revolute
     if (type == 1):
-
         q = df.load(joint_q, start)
         X_jc = spatial_transform(float3(0.0, 0.0, 0.0), quat_from_axis_angle(axis, q))
         return X_jc
 
     # fixed
     if (type == 2):
-
         X_jc = spatial_transform_identity()
         return X_jc
 
     # free
     if (type == 3):
-
         px = df.load(joint_q, start + 0)
         py = df.load(joint_q, start + 1)
         pz = df.load(joint_q, start + 2)
@@ -942,11 +932,10 @@ def jcalc_transform(type: int, axis: df.float3, joint_q: df.tensor(float), start
 
 # compute motion subspace and velocity for a joint
 @df.func
-def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S_s: df.tensor(df.spatial_vector), joint_qd: df.tensor(float), joint_start: int):
-
+def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S_s: df.tensor(df.spatial_vector),
+                 joint_qd: df.tensor(float), joint_start: int):
     # prismatic
     if (type == 0):
-
         S_s = df.spatial_transform_twist(X_sc, spatial_vector(float3(0.0, 0.0, 0.0), axis))
         v_j_s = S_s * df.load(joint_qd, joint_start)
 
@@ -955,7 +944,6 @@ def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S
 
     # revolute
     if (type == 1):
-
         S_s = df.spatial_transform_twist(X_sc, spatial_vector(axis, float3(0.0, 0.0, 0.0)))
         v_j_s = S_s * df.load(joint_qd, joint_start)
 
@@ -968,7 +956,6 @@ def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S
 
     # free
     if (type == 3):
-
         v_j_c = spatial_vector(df.load(joint_qd, joint_start + 0),
                                df.load(joint_qd, joint_start + 1),
                                df.load(joint_qd, joint_start + 2),
@@ -979,12 +966,18 @@ def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S
         v_j_s = spatial_transform_twist(X_sc, v_j_c)
 
         # write motion subspace
-        df.store(joint_S_s, joint_start + 0, spatial_transform_twist(X_sc, spatial_vector(1.0, 0.0, 0.0, 0.0, 0.0, 0.0)))
-        df.store(joint_S_s, joint_start + 1, spatial_transform_twist(X_sc, spatial_vector(0.0, 1.0, 0.0, 0.0, 0.0, 0.0)))
-        df.store(joint_S_s, joint_start + 2, spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 1.0, 0.0, 0.0, 0.0)))
-        df.store(joint_S_s, joint_start + 3, spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 1.0, 0.0, 0.0)))
-        df.store(joint_S_s, joint_start + 4, spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 0.0, 1.0, 0.0)))
-        df.store(joint_S_s, joint_start + 5, spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)))
+        df.store(joint_S_s, joint_start + 0,
+                 spatial_transform_twist(X_sc, spatial_vector(1.0, 0.0, 0.0, 0.0, 0.0, 0.0)))
+        df.store(joint_S_s, joint_start + 1,
+                 spatial_transform_twist(X_sc, spatial_vector(0.0, 1.0, 0.0, 0.0, 0.0, 0.0)))
+        df.store(joint_S_s, joint_start + 2,
+                 spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 1.0, 0.0, 0.0, 0.0)))
+        df.store(joint_S_s, joint_start + 3,
+                 spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 1.0, 0.0, 0.0)))
+        df.store(joint_S_s, joint_start + 4,
+                 spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 0.0, 1.0, 0.0)))
+        df.store(joint_S_s, joint_start + 5,
+                 spatial_transform_twist(X_sc, spatial_vector(0.0, 0.0, 0.0, 0.0, 0.0, 1.0)))
 
         return v_j_s
 
@@ -1021,8 +1014,8 @@ def jcalc_motion(type: int, axis: df.float3, X_sc: df.spatial_transform, joint_S
 
 # computes joint space forces/torques in tau
 @df.func
-def jcalc_tau(type: int, joint_S_s: df.tensor(spatial_vector), joint_start: int, body_f_s: spatial_vector, tau: df.tensor(float)):
-
+def jcalc_tau(type: int, joint_S_s: df.tensor(spatial_vector), joint_start: int, body_f_s: spatial_vector,
+              tau: df.tensor(float)):
     # prismatic / revolute
     if (type == 0 or type == 1):
         S_s = df.load(joint_S_s, joint_start)
@@ -1030,49 +1023,47 @@ def jcalc_tau(type: int, joint_S_s: df.tensor(spatial_vector), joint_start: int,
 
     # free
     if (type == 3):
-            
+
         for i in range(0, 6):
-            S_s = df.load(joint_S_s, joint_start+i)
-            df.store(tau, joint_start+i, spatial_dot(S_s, body_f_s))
+            S_s = df.load(joint_S_s, joint_start + i)
+            df.store(tau, joint_start + i, spatial_dot(S_s, body_f_s))
 
     return 0
 
 
 @df.func
-def jcalc_integrate(type: int, joint_q: df.tensor(float), joint_qd: df.tensor(float), joint_qdd: df.tensor(float), coord_start: int, dof_start: int, dt: float):
-
+def jcalc_integrate(type: int, joint_q: df.tensor(float), joint_qd: df.tensor(float), joint_qdd: df.tensor(float),
+                    coord_start: int, dof_start: int, dt: float):
     # prismatic / revolute
     if (type == 0 or type == 1):
-
         qdd = df.load(joint_qdd, dof_start)
         qd = df.load(joint_qd, dof_start)
         q = df.load(joint_q, coord_start)
 
-        df.store(joint_qd, dof_start, qd + qdd*dt)
-        df.store(joint_qd, coord_start, q + qd*dt)
+        df.store(joint_qd, dof_start, qd + qdd * dt)
+        df.store(joint_qd, coord_start, q + qd * dt)
 
     # free
     if (type == 3):
 
         # linear part
         for i in range(0, 3):
-            
-            qdd = df.load(joint_qdd, dof_start+3+i)
-            qd = df.load(joint_qd, dof_start+3+i)
-            q = df.load(joint_q, coord_start+i)
+            qdd = df.load(joint_qdd, dof_start + 3 + i)
+            qd = df.load(joint_qd, dof_start + 3 + i)
+            q = df.load(joint_q, coord_start + i)
 
-            df.store(joint_qd, dof_start+3+i, qd + qdd*dt)
-            df.store(joint_q, coord_start+i, q + qd*dt)
+            df.store(joint_qd, dof_start + 3 + i, qd + qdd * dt)
+            df.store(joint_q, coord_start + i, q + qd * dt)
 
         # angular part
-        
+
         w = float3(df.load(joint_qd, dof_start + 0),
                    df.load(joint_qd, dof_start + 1),
                    df.load(joint_qd, dof_start + 2))
 
         # # quat and quat derivative
         # r = quat(
-            
+
         #     q[q_start + 3], q[q_start + 4], q[q_start + 5], q[q_start + 6])
         # drdt = quat_multiply((*w, 0.0), r) * 0.5
 
@@ -1085,6 +1076,7 @@ def jcalc_integrate(type: int, joint_q: df.tensor(float), joint_qd: df.tensor(fl
         # q[q_start + 6] = r_new[3]
 
     return 0
+
 
 @df.func
 def compute_link_transform(i: int,
@@ -1099,7 +1091,6 @@ def compute_link_transform(i: int,
                            joint_S_s: df.tensor(df.spatial_vector),
                            body_X_sc: df.tensor(df.spatial_transform),
                            body_X_sm: df.tensor(df.spatial_transform)):
-
     # parent transform
     parent = load(joint_parent, i)
 
@@ -1114,7 +1105,7 @@ def compute_link_transform(i: int,
     dof_start = load(joint_qd_start, i)
 
     # compute transform across joint
-    #X_jc = spatial_jcalc(type, joint_q, axis, coord_start)
+    # X_jc = spatial_jcalc(type, joint_q, axis, coord_start)
     X_jc = jcalc_transform(type, axis, joint_q, coord_start)
 
     X_pj = load(joint_X_pj, i)
@@ -1125,7 +1116,7 @@ def compute_link_transform(i: int,
     X_sm = spatial_transform_multiply(X_sc, X_cm)
 
     # compute motion subspace in space frame (J)
-    #self.joint_S_s[i] = transform_twist(X_sc, S_c)
+    # self.joint_S_s[i] = transform_twist(X_sc, S_c)
 
     # store geometry transforms
     store(body_X_sc, i, X_sc)
@@ -1148,7 +1139,6 @@ def eval_rigid_fk(articulation_start: df.tensor(int),
                   joint_S_s: df.tensor(df.spatial_vector),
                   body_X_sc: df.tensor(df.spatial_transform),
                   body_X_sm: df.tensor(df.spatial_transform)):
-
     # one thread per-articulation
     index = tid()
 
@@ -1170,9 +1160,7 @@ def eval_rigid_fk(articulation_start: df.tensor(int),
                                body_X_sm)
 
 
-
-
-#@df.func
+# @df.func
 def compute_link_velocity(i: int,
                           joint_type: df.tensor(int),
                           joint_parent: df.tensor(int),
@@ -1191,7 +1179,6 @@ def compute_link_velocity(i: int,
                           body_v_s: df.tensor(df.spatial_vector),
                           body_f_s: df.tensor(df.spatial_vector),
                           body_a_s: df.tensor(df.spatial_vector)):
-
     type = df.load(joint_type, i)
     axis = df.load(joint_axis, i)
     dof_start = df.load(joint_qd_start, i)
@@ -1213,7 +1200,7 @@ def compute_link_velocity(i: int,
 
     # body velocity, acceleration
     v_s = v_parent_s + v_j_s
-    a_s = a_parent_s + spatial_cross(v_s, v_j_s) # + self.joint_S_s[i]*self.joint_qdd[i]
+    a_s = a_parent_s + spatial_cross(v_s, v_j_s)  # + self.joint_S_s[i]*self.joint_qdd[i]
 
     # compute body forces
     X_sm = df.load(body_X_sm, i)
@@ -1224,7 +1211,7 @@ def compute_link_velocity(i: int,
 
     m = I_m[3, 3]
     f_ext_m = spatial_vector(float3(), g) * m
-    f_ext_s = f_ext_m # todo: spatial_transform_wrench(X_sm, f_ext_m)
+    f_ext_s = f_ext_m  # todo: spatial_transform_wrench(X_sm, f_ext_m)
 
     # body forces
     I_s = spatial_transform_inertia(X_sm, I_m)
@@ -1239,7 +1226,7 @@ def compute_link_velocity(i: int,
     return 0
 
 
-#@df.func
+# @df.func
 def compute_link_tau(i: int,
                      joint_type: df.tensor(int),
                      joint_parent: df.tensor(int),
@@ -1249,13 +1236,12 @@ def compute_link_tau(i: int,
                      body_f_s: df.tensor(df.spatial_vector),
                      body_f_subtree_s: df.tensor(df.spatial_vector),
                      tau: df.tensor(float)):
-
     type = df.load(joint_type, i)
     parent = df.load(joint_parent, i)
     dof_start = df.load(joint_qd_start, i)
 
-    f_s = df.load(body_f_s, i)                   # external forces on body
-    f_child = df.load(body_f_subtree_s, i)       # forces acting on subtree of body
+    f_s = df.load(body_f_s, i)  # external forces on body
+    f_child = df.load(body_f_subtree_s, i)  # forces acting on subtree of body
 
     f_tot = f_s + f_child
 
@@ -1268,7 +1254,7 @@ def compute_link_tau(i: int,
     return 0
 
 
-#@df.kernel
+# @df.kernel
 def eval_rigid_id(joint_type: df.tensor(int),
                   joint_parent: df.tensor(int),
                   joint_q_start: df.tensor(int),
@@ -1280,7 +1266,6 @@ def eval_rigid_id(joint_type: df.tensor(int),
                   joint_S_s: df.tensor(df.spatial_vector),
                   body_X_sc: df.tensor(df.spatial_transform),
                   body_X_sm: df.tensor(df.spatial_transform)):
-
     # one thread per-articulation
     index = tid()
 
@@ -1311,8 +1296,6 @@ def eval_rigid_id(joint_type: df.tensor(int),
         )
 
 
-
-
 # define PyTorch autograd op to wrap simulate func
 class SimulateFunc(torch.autograd.Function):
     @staticmethod
@@ -1335,7 +1318,7 @@ class SimulateFunc(torch.autograd.Function):
         adj_outputs = df.make_contiguous(grads)
 
         # register outputs with tape
-        outputs = df.to_strong_list(ctx.outputs)        
+        outputs = df.to_strong_list(ctx.outputs)
         for o in range(len(outputs)):
             ctx.tape.adjoints[outputs[o]] = adj_outputs[o]
 
@@ -1381,16 +1364,15 @@ class SemiImplicitIntegrator:
 
             # damped springs
             if (model.spring_count):
-
                 tape.launch(func=eval_springs,
                             dim=model.spring_count,
-                            inputs=[state_in.q, state_in.u, model.spring_indices, model.spring_rest_length, model.spring_stiffness, model.spring_damping],
+                            inputs=[state_in.q, state_in.u, model.spring_indices, model.spring_rest_length,
+                                    model.spring_stiffness, model.spring_damping],
                             outputs=[f_particle],
                             adapter=model.adapter)
 
             # triangle elastic and lift/drag forces
             if (model.tri_count and model.tri_ke > 0.0):
-
                 tape.launch(func=eval_triangles,
                             dim=model.tri_count,
                             inputs=[
@@ -1430,32 +1412,32 @@ class SemiImplicitIntegrator:
 
             # triangle bending
             if (model.edge_count):
-
                 tape.launch(func=eval_bending,
                             dim=model.edge_count,
-                            inputs=[state_in.q, state_in.u, model.edge_indices, model.edge_rest_angle, model.edge_ke, model.edge_kd],
+                            inputs=[state_in.q, state_in.u, model.edge_indices, model.edge_rest_angle, model.edge_ke,
+                                    model.edge_kd],
                             outputs=[f_particle],
                             adapter=model.adapter)
 
             # ground contact
             if (model.ground):
-
                 tape.launch(func=eval_contacts,
                             dim=model.particle_count,
-                            inputs=[state_in.q, state_in.u, model.contact_ke, model.contact_kd, model.contact_kf, model.contact_mu],
+                            inputs=[state_in.q, state_in.u, model.contact_ke, model.contact_kd, model.contact_kf,
+                                    model.contact_mu],
                             outputs=[f_particle],
                             adapter=model.adapter)
 
             # tetrahedral FEM
             if (model.tet_count):
-
                 tape.launch(func=eval_tetrahedra,
                             dim=model.tet_count,
-                            inputs=[state_in.q, state_in.u, model.tet_indices, model.tet_poses, model.tet_activations, model.tet_materials],
+                            inputs=[state_in.q, state_in.u, model.tet_indices, model.tet_poses, model.tet_activations,
+                                    model.tet_materials],
                             outputs=[f_particle],
                             adapter=model.adapter)
 
-            #----------------------------
+            # ----------------------------
             # rigid forces
 
             # eval contacts with all shapes that have been specified.
@@ -1499,7 +1481,7 @@ class SemiImplicitIntegrator:
                                 outputs=[f_particle],
                                 adapter=model.adapter)
 
-            #----------------------------
+            # ----------------------------
             # integrate
 
             if (model.particle_count):
@@ -1529,7 +1511,6 @@ class SemiImplicitIntegrator:
 
             return state_out
 
-
     def forward(self, model, state_in, dt):
 
         if config.no_grad:
@@ -1550,4 +1531,3 @@ class SemiImplicitIntegrator:
             tensors = SimulateFunc.apply(self, model, state_in, state_out, dt, *inputs)
 
             return state_out
-            

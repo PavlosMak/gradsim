@@ -1,0 +1,66 @@
+{
+  "mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/training_mesh_decimated.obj",
+  "outdir": "",
+  "sim_duration": 2.0,
+  "sim_substeps": 800,
+  "physics_engine_rate": 24,
+  "position": [
+    0,
+    0,
+    0
+  ],
+  "scale": 2,
+  "initial_velocity": [
+    -0.407895,
+    -0.5,
+    0.06629
+  ],
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
+  "density": 500.0,
+  "mu": 8843.973492611021,
+  "lambda": 13354.101568253574,
+  "damp": 35,
+  "training": {
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/pseudo_gt_positions.npz",
+    "exp_name": "elastic_0",
+    "frame_count": 14,
+    "epochs": 1200,
+    "velocity_epochs": 50,
+    "velocity_frames": 4,
+    "warmup_start_frame": 6,
+    "seed": 42,
+    "E_initialization": "torch.tensor(10000)",
+    "nu_initialization": "torch.tensor(0.25)",
+    "lr": {
+      "E": 0.1,
+      "nu": 0.001,
+      "velocity": 0.25,
+      "mass": 0.1
+    },
+    "warmup_lr": {
+      "nu": 0.005,
+      "E": 0.1
+    },
+    "warmup_iters": 15,
+    "optimize": [
+      "velocity",
+      "mu",
+      "lambda"
+    ],
+    "loss": {
+      "name": "chamfer",
+      "batch_reduction": "mean"
+    },
+    "offset_floor": [0, 0, 0],
+    "compare_every": 1,
+    "logging_interval": 5,
+    "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
+    "sim_scale": 1,
+    "gt_scale": 1,
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/poisson_reconstructed_rescaled.obj",
+    "eval_for": 14,
+    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
+    "transform_gt_points": true
+  }
+}

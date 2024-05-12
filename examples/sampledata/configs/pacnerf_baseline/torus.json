@@ -1,0 +1,62 @@
+{
+  "mesh": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/torus/pacnerf_torus_radius.obj",
+  "outdir": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/torus",
+  "sim_duration": 0.6,
+  "sim_substeps": 10000,
+  "physics_engine_rate": 24,
+  "position": [0, 0, 0],
+  "scale": 1,
+  "initial_velocity": [-0.21, -0.5, -0.2],
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+  "density": 600,
+  "damp": 0.0,
+  "mu": 384615.3846153846,
+  "lambda": 576923.0769230769,
+  "training": {
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/toasty-rain/pseudo_gt_positions.npz",
+    "exp_name": "torus",
+    "frame_count": 14,
+    "epochs": 0,
+    "velocity_epochs": 50,
+    "velocity_frames": 5,
+    "warmup_start_frame": 6,
+    "warmup_iters": 0,
+    "seed": 42,
+    "E_initialization": "torch.tensor(100000)",
+    "nu_initialization": "torch.tensor(0.1)",
+    "lr": {
+      "E": 0.1,
+      "nu": 0.001,
+      "velocity": 0.25,
+      "mass": 0.1
+    },
+    "warmup_lr": {
+      "nu": 0.005,
+      "E": 0.1
+    },
+    "optimize": [
+      "velocity",
+      "mu",
+      "lambda"
+    ],
+    "loss": {
+      "name": "chamfer",
+      "batch_reduction": "mean"
+    },
+    "offset_floor": [
+      0,
+      0,
+      0
+    ],
+    "compare_every": 1,
+    "logging_interval": 5,
+    "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
+    "sim_scale": 1,
+    "gt_scale": 1,
+    "training_mesh": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/torus/pacnerf_torus.obj",
+    "eval_for": 14,
+    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+    "transform_gt_points": true
+  }
+}
