@@ -82,7 +82,7 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 
     model.contact_distance = 0.01
     model.contact_ke = 500  # original 1e+3
-    model.contact_kd = 0.0  # original 0.0
+    model.contact_kd = 13.0  # original 0.0
     model.contact_kf = 1e3   # original 1e+3
     model.contact_mu = 0.5  # original 0.5 - works best.
 

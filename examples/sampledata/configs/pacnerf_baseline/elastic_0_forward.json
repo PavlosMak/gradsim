@@ -1,5 +1,5 @@
 {
-  "mesh": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/elastic_0/alpha_wrap_subdivided.obj",
+  "mesh": "/media/pavlos/One Touch/datasets/gt_generation/helpful-dream/training_mesh_decimated.obj",
   "outdir": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/elastic_0",
   "sim_duration": 0.5,
   "sim_substeps": 5000,
@@ -7,7 +7,7 @@
   "position": [0, 0, 0],
   "scale": 1,
   "initial_velocity": [-0.407895, -0.5, -0.06629],
-  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -0.5 * math.pi)",
   "density": 330,
   "damp": 5,
   "mu": 8843.973492611021,
