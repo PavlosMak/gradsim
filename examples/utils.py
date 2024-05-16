@@ -104,6 +104,12 @@ def get_volumes(tet_indices, vertex_buffer):
     return torch.stack(tet_volumes)
 
 
+def classical_lame_to_neo(mu_lame: float, lam_lame: float):
+  mu = (4/3)*mu_lame
+  lam = lam_lame + (5/6)*mu_lame
+  return mu, lam
+
+
 def lame_from_young(E: float, nu: float):
     """
     Calculate the Lame parameters from Young's modulus

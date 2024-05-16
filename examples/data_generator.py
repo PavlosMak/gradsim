@@ -8,7 +8,7 @@ import torch
 
 from examples.training_utils import forward_pass
 from gradsim import dflex as df
-from utils import export_obj, load_mesh
+from utils import export_obj, load_mesh, classical_lame_to_neo
 
 if __name__ == "__main__":
     # Load arguments and simulation configuration
@@ -35,8 +35,9 @@ if __name__ == "__main__":
     velocity = tuple(simulation_config["initial_velocity"])
     scale = simulation_config["scale"]
     density = simulation_config["density"]
-    k_mu = simulation_config["mu"]
-    k_lambda = simulation_config["lambda"]
+    mu_lame = simulation_config["mu"]
+    lambda_lame = simulation_config["lambda"]
+    k_mu, k_lambda = classical_lame_to_neo(mu_lame, lambda_lame)
     k_damp = simulation_config["damp"]
 
     particle_inv_mass = None
