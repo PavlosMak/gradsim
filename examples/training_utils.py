@@ -66,7 +66,14 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
         return out_mu, out_lambda, self.global_velocity, out_masses
 
 
-def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp):
+def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp, contact_ke=500,
+                  contact_kd=13.0, contact_kf=1e3, contact_mu=0.5):
+    """
+        contact_ke:  affects force in the direction of the normal
+        contact_kd:  scales the normal essentially, and then is added as a force, if the velocity on the normal is negative.
+        contact_kf:  multiplies the tangent (x-z plane) force and is applied as a friction force
+        contact_mu:  defines the lower threshold where friction forces are applied
+    """
     builder = df.sim.ModelBuilder()
     builder.add_soft_mesh(pos=pos, rot=rot, scale=scale, vel=vel,
                           vertices=vertices, indices=tet_indices, density=density,
@@ -80,16 +87,10 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
     model.tri_kd = 0.0
     model.tri_kb = 0.0
 
-    model.contact_distance = 0.01
-    model.contact_ke = 500  # original 1e+3
-    model.contact_kd = 13.0  # original 0.0
-    model.contact_kf = 1e3   # original 1e+3
-    model.contact_mu = 0.5  # original 0.5 - works best.
-
-    # model.contact_ke = 1000.0    # affects force in the direction of the normal
-    # model.contact_kd = 1.0       # scales the normal essentially, and then is added as a force, if the velocity on the normal is negative.
-    # model.contact_kf = 10000.0    # multiplies the tangent (x-z plane) force and is applied as a friction force
-    # model.contact_mu = 0.9   # defines the lower threshold where friction forces are applied
+    model.contact_ke = contact_ke  # original 1e+3
+    model.contact_kd = contact_kd  # original 0.0
+    model.contact_kf = contact_kf  # original 1e+3
+    model.contact_mu = contact_mu  # original 0.5 - works best.
 
     model.ground = True
 
@@ -99,8 +100,13 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
                  prediction_model=None, mass_noise=None, fix_top_plane=False,
-                 optimization_set={"mu", "lambda", "velocity", "masses"}):
-    model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
+                 optimization_set={"mu", "lambda", "velocity", "masses"}, contact_params=None):
+    if contact_params is None:
+        model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
+    else:
+        model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp,
+                              contact_ke=contact_params["ke"], contact_kd=contact_params["kd"],
+                              contact_kf=contact_params["kf"], contact_mu=contact_params["mu"])
 
     if mass_noise is not None:
         model.particle_inv_mass = model.particle_inv_mass + model.particle_inv_mass * mass_noise

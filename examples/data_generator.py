@@ -46,6 +46,11 @@ if __name__ == "__main__":
     if "fix_top_plane" in simulation_config:
         fix_top_plane = simulation_config["fix_top_plane"]
 
+    contact_params=None
+    if "contact_params" in simulation_config:
+        contact_params = simulation_config["contact_params"]
+
+    print(contact_params)
     with torch.no_grad():
         sim_dt = (1.0 / simulation_config["physics_engine_rate"]) / simulation_config["sim_substeps"]
         sim_steps = int(simulation_config["sim_duration"] / sim_dt)
@@ -55,7 +60,7 @@ if __name__ == "__main__":
         positions, model, state, average_initial_velocity = forward_pass(position, r,
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
-                                                                         sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane)
+                                                                         sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane, contact_params=contact_params)
     # Output results
     masses = model.particle_inv_mass.detach().cpu().numpy()
     np.savez(f"{outdir}/particle_inv_mass.npz", masses)
