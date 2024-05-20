@@ -791,8 +791,7 @@ def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, k
     # c = df.leaky_min(dot(n, x0)-0.01, 0.0, 0.0)
 
     vn = dot(n, v0)
-    # vt = v0 - n * df.min(dot(n, v0), 0.0)  # PACNERF
-    vt = v0 - n * vn # ORIGINAL
+    vt = v0 - n * vn
 
     fn = n * c * ke
 
@@ -812,9 +811,9 @@ def eval_contacts(x: df.tensor(df.float3), v: df.tensor(df.float3), ke: float, k
     ft = df.float3(vx, 0.0, vz)
 
     # Coulomb friction (smooth, but gradients are numerically unstable around |vt| = 0)
-    # ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke) #originally commented
+    # ft = df.normalize(vt)*df.min(kf*df.length(vt), 0.0 - mu*c*ke)
 
-    ftotal = fn + (fd + ft) * df.step(c) # Original
+    ftotal = fn + (fd + ft) * df.step(c)
 
     df.atomic_sub(f, tid, ftotal)
 

@@ -1,6 +1,6 @@
 {
-  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/torus/torus.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus",
+  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/old/torus/torus.obj",
+  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/old/torus",
   "sim_duration": 2.0,
   "sim_substeps": 1500,
   "physics_engine_rate": 24,
