@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     output_directory = f"{training_config['logdir']}/{run.name}"
     os.makedirs(output_directory)
-    # torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
+    torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
 
     training_frame_count = training_config["frame_count"]
     sim_dt = (1.0 / simulation_config["physics_engine_rate"]) / simulation_config["sim_substeps"]
@@ -92,7 +92,6 @@ if __name__ == "__main__":
 
     initial_E = initialize_from_config(training_config, "E_initialization", torch.tensor(1e3))
     initial_nu = initialize_from_config(training_config, "nu_initialization", torch.tensor(0.1))
-    initial_mu, initial_lambda = lame_from_young(initial_E, initial_nu)
 
     print(f"Initial values: \n E: {initial_E}; nu: {initial_nu}")
 
@@ -104,6 +103,11 @@ if __name__ == "__main__":
     #                                initial_velocity=initial_velocity_estimate,
     #                                initial_masses=initial_masses,
     #                                update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
+
+    # Turn E, nu initialization to the rescaled version required by Neo-hookean.
+    initial_mu_lame, initial_lambda_lame = lame_from_young(initial_E, initial_nu)
+    initial_mu, initial_lambda = classical_lame_to_neo(initial_mu_lame, initial_lambda_lame)
+    initial_E, initial_nu = young_from_lame(initial_mu, initial_lambda)
 
     physical_model = PhysicalModelYoungPoisson(initial_E=initial_E, initial_nu=initial_nu,
                                                initial_masses=initial_masses, update_scale_masses=1.0)
@@ -145,22 +149,6 @@ if __name__ == "__main__":
     velocity_epochs = training_config["velocity_epochs"]
     velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
 
-    # def closure():
-    #     velocity_optimizer.zero_grad()
-    #     positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
-    #                                                                      scale, velocity, points, tet_indices,
-    #                                                                      density,
-    #                                                                      k_mu, k_lambda, k_damp,
-    #                                                                      training_sim_steps, sim_dt, render_steps,
-    #                                                                      physical_model,
-    #                                                                      fix_top_plane=fix_top_plane,
-    #                                                                      optimization_set=optimization_set)
-    #     loss = lossfn(positions[:3], positions_pseudo_gt[:3])
-    #     loss.backward()
-    #     print(f"Loss: {loss.item()}")
-    #     wandb.log({"Loss": loss.item()})
-    #     return loss
-
     for e in range(velocity_epochs):
         if "velocity" not in optimization_set:
             break
@@ -178,8 +166,6 @@ if __name__ == "__main__":
         loss.backward()
         velocity_optimizer.step()
 
-        # velocity_optimizer.step(closure=closure)
-        #
         if (e % training_config["logging_interval"] == 0 or e == velocity_epochs - 1):
             print(f"Velocity Epoch: {(e + 1):03d}/{velocity_epochs:03d}")
             print(f"Velocity estimate: {physical_model.global_velocity.data}")
@@ -211,14 +197,15 @@ if __name__ == "__main__":
         if e == 0 and warmup_iters > 0:
             print("Setting warmup LRs")
             for param_group in optimizer.param_groups:
-                if param_group["name"] in warmup_lrs:
+
+               if param_group["name"] in warmup_lrs:
                     param_group["lr"] = warmup_lrs[param_group["name"]]
-        if e == warmup_iters + 1:
+        if e == warmup_iters + 1 and warmup_iters > 0:
             print("Setting Rest LRs")
             for param_group in optimizer.param_groups:
                 if param_group["name"] in rest_lrs:
                     param_group["lr"] = rest_lrs[param_group["name"]]
-        if e <= warmup_iters:
+        if e <= warmup_iters and warmup_iters > 0:
             loss = lossfn(positions[warmup_start_frame:], positions_pseudo_gt[warmup_start_frame:])
             loss.backward()
             optimizer.step()
@@ -233,6 +220,7 @@ if __name__ == "__main__":
 
             estimated_mu = torch.mean(model.tet_materials[:, 0])
             estimated_lambda = torch.mean(model.tet_materials[:, 1])
+            estimated_mu, estimated_lambda = neo_lame_to_classical_lame(estimated_mu, estimated_lambda)
 
             mu_estimates.append(estimated_mu.item())
             lambda_esimates.append(estimated_lambda.item())
@@ -244,6 +232,7 @@ if __name__ == "__main__":
             mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu)
             lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
             lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
+
 
             estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
             print(f"E estimate: {estimated_E}")

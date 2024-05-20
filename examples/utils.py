@@ -109,6 +109,10 @@ def classical_lame_to_neo(mu_lame: float, lam_lame: float):
   lam = lam_lame + (5/6)*mu_lame
   return mu, lam
 
+def neo_lame_to_classical_lame(mu, lam):
+    mu_lame = (3/4)*mu
+    lam_lame = lam - (5/6)*mu_lame
+    return mu_lame, lam_lame
 
 def lame_from_young(E: float, nu: float):
     """

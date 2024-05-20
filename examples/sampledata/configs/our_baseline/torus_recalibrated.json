@@ -1,34 +1,32 @@
 {
   "mesh": "/media/pavlos/One Touch/datasets/our_baseline/torus/torus.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus",
+  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus_recalibrated",
   "sim_duration": 2.0,
   "sim_substeps": 1500,
   "physics_engine_rate": 24,
-  "position": [
-    0,
-    0,
-    0
-  ],
+  "position": [0, 0, 0],
   "scale": 0.85,
-  "initial_velocity": [
-    0,
-    0.0,
-    0.0
-  ],
+  "initial_velocity": [0, -0.5, 0.0],
+  "contact_params": {
+    "ke": 500,
+    "kd": 13.0,
+    "kf": 1e3,
+    "mu": 0.5
+  },
   "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -math.pi * 0.5)",
   "density": 100.0,
   "mu": 1.0e4,
   "lambda": 1.0e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/fast-water/pseudo_gt_positions.npz",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/denim-pyramid/pseudo_gt_positions.npz",
     "exp_name": "torus",
     "frame_count": 12,
-    "velocity_epochs": 1,
+    "velocity_epochs": 0,
     "velocity_frames": 4,
-    "warmup_iters": 15,
+    "warmup_iters": 0,
     "warmup_start_frame": 6,
-    "epochs": 950,
+    "epochs": 3,
     "seed": 42,
     "lr": {
       "E": 0.1,
@@ -57,7 +55,7 @@
       0
     ],
     "compare_every": 1,
-    "logging_interval": 5,
+    "logging_interval": 1,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 1,
     "gt_scale": 1,
