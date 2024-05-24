@@ -15,7 +15,7 @@
   "contact_params": {
     "ke": 500,
     "kd": 13.0,
-    "kf": 300,
+    "kf": 10,
     "mu": 0.5
   },
   "training": {

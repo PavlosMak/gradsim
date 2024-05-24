@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     output_directory = f"{training_config['logdir']}/{run.name}"
     os.makedirs(output_directory)
-    torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
+    # torch.autograd.set_detect_anomaly(True)  # Uncomment to debug backpropagation
 
     training_frame_count = training_config["frame_count"]
     sim_dt = (1.0 / simulation_config["physics_engine_rate"]) / simulation_config["sim_substeps"]
@@ -81,12 +81,23 @@ if __name__ == "__main__":
     velocity = tuple(simulation_config["initial_velocity"])
     scale = 1.0
     density = simulation_config["density"]
+    if "training_density" in training_config:
+        density = training_config["training_density"]
     k_mu = simulation_config["mu"]
     k_lambda = simulation_config["lambda"]
     k_damp = simulation_config["damp"]
 
-    model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
-                          k_lambda, k_damp)
+    contact_params = None
+    if "contact_params" in simulation_config:
+        contact_params = simulation_config["contact_params"]
+
+    if contact_params is None:
+        model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
+                              k_lambda, k_damp)
+    else:
+        model = model_factory(position, df.quat_identity(), scale, velocity, points, tet_indices, density, k_mu,
+                              k_lambda, k_damp, contact_ke=contact_params["ke"], contact_kd=contact_params["kd"],
+                              contact_kf=contact_params["kf"], contact_mu=contact_params["mu"])
 
     gt_mass = model.particle_inv_mass.clone()
 
@@ -133,7 +144,7 @@ if __name__ == "__main__":
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
                                                       sim_dt, render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                                      optimization_set=optimization_set)
+                                                      optimization_set=optimization_set, contact_params=contact_params)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -161,7 +172,8 @@ if __name__ == "__main__":
                                                                          velocity_sim_steps, sim_dt, render_steps,
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
-                                                                         optimization_set=optimization_set)
+                                                                         optimization_set=optimization_set,
+                                                                         contact_params=contact_params)
         loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
         loss.backward()
         velocity_optimizer.step()
@@ -193,12 +205,13 @@ if __name__ == "__main__":
                                                                          k_mu, k_lambda, k_damp,
                                                                          training_sim_steps, sim_dt, render_steps,
                                                                          physical_model, fix_top_plane=fix_top_plane,
-                                                                         optimization_set=optimization_set)
+                                                                         optimization_set=optimization_set,
+                                                                         contact_params=contact_params)
         if e == 0 and warmup_iters > 0:
             print("Setting warmup LRs")
             for param_group in optimizer.param_groups:
 
-               if param_group["name"] in warmup_lrs:
+                if param_group["name"] in warmup_lrs:
                     param_group["lr"] = warmup_lrs[param_group["name"]]
         if e == warmup_iters + 1 and warmup_iters > 0:
             print("Setting Rest LRs")
@@ -232,7 +245,6 @@ if __name__ == "__main__":
             mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu)
             lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
             lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
-
 
             estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
             print(f"E estimate: {estimated_E}")
@@ -275,7 +287,7 @@ if __name__ == "__main__":
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                          optimization_set=optimization_set)
+                                          optimization_set=optimization_set, contact_params=contact_params)
     total_error = lossfn(positions[:len(positions_pseudo_gt)], positions_pseudo_gt)
     print(f"Evaluation Error: {total_error}")
     run.summary["Evaluation Error"] = total_error

@@ -1,16 +1,16 @@
 {
-  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/torus/torus.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus_recalibrated",
+  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/torus_kf10/torus.obj",
+  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus_kf10",
   "sim_duration": 2.0,
   "sim_substeps": 1500,
   "physics_engine_rate": 30,
   "position": [0, 0, 0],
   "scale": 0.85,
-  "initial_velocity": [0, -0.5, 0.0],
+  "initial_velocity": [-0.04548586532473564, -0.9508264660835266, -0.0061215683817863464],
   "contact_params": {
     "ke": 500,
     "kd": 13.0,
-    "kf": 1e3,
+    "kf": 10,
     "mu": 0.5
   },
   "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -math.pi * 0.5)",
@@ -19,19 +19,19 @@
   "lambda": 1.0e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/denim-pyramid/pseudo_gt_positions.npz",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/ancient-leaf/pseudo_gt_positions.npz",
     "exp_name": "torus",
     "frame_count": 12,
-    "velocity_epochs": 0,
-    "velocity_frames": 4,
+    "velocity_epochs": 50,
+    "velocity_frames": 5,
     "warmup_iters": 0,
     "warmup_start_frame": 6,
-    "epochs": 3,
+    "epochs": 300,
     "seed": 42,
     "lr": {
       "E": 0.1,
       "nu": 0.001,
-      "velocity": 0.001,
+      "velocity": 0.5,
       "mass": 0.1
     },
     "E_initialization": "torch.tensor(10000.0)",
@@ -49,13 +49,9 @@
       "name": "chamfer",
       "batch_reduction": "mean"
     },
-    "offset_floor": [
-      0,
-      0,
-      0
-    ],
+    "offset_floor": [0, 0, 0],
     "compare_every": 1,
-    "logging_interval": 1,
+    "logging_interval": 5,
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 1,
     "gt_scale": 1,
