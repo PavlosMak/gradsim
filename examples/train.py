@@ -47,7 +47,7 @@ if __name__ == "__main__":
         points, tet_indices = load_pseudo_gt_mesh(path_to_exp)
     else:
         print(f"Using Training mesh {training_config['training_mesh']}")
-        points, tet_indices, _ = load_mesh(training_config["training_mesh"])
+        points, tet_indices, surfaces_vertices = load_mesh(training_config["training_mesh"])
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
 
@@ -99,7 +99,9 @@ if __name__ == "__main__":
                               k_lambda, k_damp, contact_ke=contact_params["ke"], contact_kd=contact_params["kd"],
                               contact_kf=contact_params["kf"], contact_mu=contact_params["mu"])
 
+    np.savez(f"{output_directory}/triangle_indices.npz", model.tri_indices.numpy())
     gt_mass = model.particle_inv_mass.clone()
+
 
     initial_E = initialize_from_config(training_config, "E_initialization", torch.tensor(1e3))
     initial_nu = initialize_from_config(training_config, "nu_initialization", torch.tensor(0.1))
