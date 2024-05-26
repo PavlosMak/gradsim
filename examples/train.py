@@ -15,6 +15,7 @@ from losses import *
 
 from logging_utils import wandb_log_curve
 
+
 if __name__ == "__main__":
     print(f"Found cuda device {torch.cuda.get_device_name(0)}")
     parser = argparse.ArgumentParser()
@@ -140,14 +141,16 @@ if __name__ == "__main__":
         positions_pseudo_gt = positions_pseudo_gt + scale * torch.rand_like(positions_pseudo_gt)
 
     # Do one run before training to get full duration unoptimized
+    df.config.no_grad = True
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
                                                       sim_dt, render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                                      optimization_set=optimization_set, contact_params=contact_params)
+                                                      optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
+    df.config.no_grad = False
 
     epochs = training_config["epochs"]
     losses = []
@@ -257,9 +260,6 @@ if __name__ == "__main__":
             velocity_estimate_difference = torch.linalg.norm(average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
 
-            predicted_masses = model.particle_inv_mass
-            mass_sqrd_error = torch.nn.functional.mse_loss(predicted_masses, gt_mass)
-
             wandb.log({"Loss": loss.item(),
                        "Mu": estimated_mu,
                        "Mu Relative Error": mu_mape,
@@ -285,6 +285,7 @@ if __name__ == "__main__":
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
 
     # Evaluate
+    df.config.no_grad = True
     with torch.no_grad():
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
