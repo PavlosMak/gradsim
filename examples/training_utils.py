@@ -67,7 +67,7 @@ class PhysicalModelYoungPoisson(torch.nn.Module):
 
 
 def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_lambda, k_damp, contact_ke=500,
-                  contact_kd=13.0, contact_kf=1e3, contact_mu=0.5):
+                  contact_kd=13.0, contact_kf=1e3, contact_mu=0.5, adapter="cpu"):
     """
         contact_ke:  affects force in the direction of the normal
         contact_kd:  scales the normal essentially, and then is added as a force, if the velocity on the normal is negative.
@@ -78,9 +78,7 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
     builder.add_soft_mesh(pos=pos, rot=rot, scale=scale, vel=vel,
                           vertices=vertices, indices=tet_indices, density=density,
                           k_mu=k_mu, k_lambda=k_lambda, k_damp=k_damp)
-    model = builder.finalize("cpu")
-
-    model.gravity = torch.tensor([0.0, -9.8, 0.0])
+    model = builder.finalize(adapter)
 
     model.tri_ke = 0.0
     model.tri_ka = 0.0
@@ -92,21 +90,20 @@ def model_factory(pos, rot, scale, vel, vertices, tet_indices, density, k_mu, k_
     model.contact_kf = contact_kf
     model.contact_mu = contact_mu
 
-    model.ground = True
-
     return model
 
 
 def forward_pass(position, r, scale, velocity,
                  points, tet_indices, density, k_mu, k_lambda, k_damp, sim_steps, sim_dt, render_steps,
                  prediction_model=None, mass_noise=None, fix_top_plane=False,
-                 optimization_set={"mu", "lambda", "velocity", "masses"}, contact_params=None):
+                 optimization_set={"mu", "lambda", "velocity", "masses"}, contact_params=None, adapter="cpu"):
     if contact_params is None:
-        model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp)
+        model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp,
+                              adapter=adapter)
     else:
         model = model_factory(position, r, scale, velocity, points, tet_indices, density, k_mu, k_lambda, k_damp,
                               contact_ke=contact_params["ke"], contact_kd=contact_params["kd"],
-                              contact_kf=contact_params["kf"], contact_mu=contact_params["mu"])
+                              contact_kf=contact_params["kf"], contact_mu=contact_params["mu"], adapter=adapter)
 
     if mass_noise is not None:
         model.particle_inv_mass = model.particle_inv_mass + model.particle_inv_mass * mass_noise

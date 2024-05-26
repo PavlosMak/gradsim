@@ -16,6 +16,7 @@ from losses import *
 from logging_utils import wandb_log_curve
 
 if __name__ == "__main__":
+    print(f"Found cuda device {torch.cuda.get_device_name(0)}")
     parser = argparse.ArgumentParser()
     parser.add_argument("--outdir", type=str, default="output",
                         help="Directory to store experiment logs in.")
@@ -50,6 +51,9 @@ if __name__ == "__main__":
         points, tet_indices, surfaces_vertices = load_mesh(training_config["training_mesh"])
     tet_count = len(tet_indices) // 4
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
+    adapter = training_config["adapter"]
+    print(f"Using adapter (aka device): {adapter}")
+
 
     np.savez(f"{output_directory}/vertices.npz", points)
     np.savez(f"{output_directory}/tets.npz", tet_indices)
@@ -99,9 +103,8 @@ if __name__ == "__main__":
                               k_lambda, k_damp, contact_ke=contact_params["ke"], contact_kd=contact_params["kd"],
                               contact_kf=contact_params["kf"], contact_mu=contact_params["mu"])
 
-    np.savez(f"{output_directory}/triangle_indices.npz", model.tri_indices.numpy())
+    np.savez(f"{output_directory}/triangle_indices.npz", model.tri_indices.cpu().numpy())
     gt_mass = model.particle_inv_mass.clone()
-
 
     initial_E = initialize_from_config(training_config, "E_initialization", torch.tensor(1e3))
     initial_nu = initialize_from_config(training_config, "nu_initialization", torch.tensor(0.1))
@@ -111,11 +114,7 @@ if __name__ == "__main__":
     optimization_set = set(training_config["optimize"])
 
     initial_masses = 50 * torch.rand_like(model.particle_inv_mass)
-    # physical_model = PhysicalModel(initial_mu=initial_mu,
-    #                                initial_lambda=initial_lambda,
-    #                                initial_velocity=initial_velocity_estimate,
-    #                                initial_masses=initial_masses,
-    #                                update_scale_velocity=1.0, update_scale_lame=1, update_scale_masses=1.0)
+    initial_masses = initial_masses.to(torch.device(adapter))
 
     # Turn E, nu initialization to the rescaled version required by Neo-hookean.
     initial_mu_lame, initial_lambda_lame = lame_from_young(initial_E, initial_nu)
@@ -124,7 +123,7 @@ if __name__ == "__main__":
 
     physical_model = PhysicalModelYoungPoisson(initial_E=initial_E, initial_nu=initial_nu,
                                                initial_masses=initial_masses, update_scale_masses=1.0)
-
+    physical_model.to(torch.device(adapter))
     if "checkpoint_path" in training_config:
         checkpoint_path = training_config["checkpoint_path"]
         print(f"Loading checkpoint: {checkpoint_path}")
@@ -162,6 +161,7 @@ if __name__ == "__main__":
     velocity_epochs = training_config["velocity_epochs"]
     velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
 
+    positions_pseudo_gt = positions_pseudo_gt.to(torch.device(adapter))
     for e in range(velocity_epochs):
         if "velocity" not in optimization_set:
             break
@@ -175,7 +175,7 @@ if __name__ == "__main__":
                                                                          physical_model,
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
-                                                                         contact_params=contact_params)
+                                                                         contact_params=contact_params, adapter=adapter)
         loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
         loss.backward()
         velocity_optimizer.step()
@@ -208,7 +208,7 @@ if __name__ == "__main__":
                                                                          training_sim_steps, sim_dt, render_steps,
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
-                                                                         contact_params=contact_params)
+                                                                         contact_params=contact_params, adapter=adapter)
         if e == 0 and warmup_iters > 0:
             print("Setting warmup LRs")
             for param_group in optimizer.param_groups:
@@ -289,7 +289,7 @@ if __name__ == "__main__":
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                          optimization_set=optimization_set, contact_params=contact_params)
+                                          optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
     total_error = lossfn(positions[:len(positions_pseudo_gt)], positions_pseudo_gt)
     print(f"Evaluation Error: {total_error}")
     run.summary["Evaluation Error"] = total_error
