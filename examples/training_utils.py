@@ -183,7 +183,7 @@ def load_gt_positions(training_config: dict):
     floor_level_offset = torch.zeros(3)
     if "transform_gt_points" in training_config:
         gt_scale = training_config["gt_scale"]
-        for i in range(training_config["frame_count"]):
+        for i in range(len(positions_pseudo_gt)):
             frame_positions = torch.tensor(positions_pseudo_gt[i], dtype=torch.float32)
             rotation_matrix = torch.tensor(df.quat_to_matrix(r), dtype=torch.float32)
             frame_positions = gt_scale * (rotation_matrix @ frame_positions.transpose(0, 1)).transpose(0, 1)
