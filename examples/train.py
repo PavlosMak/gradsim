@@ -1,4 +1,5 @@
 import argparse
+import gc
 import json
 import math  # do not remove - required for parsing the configs
 import os
@@ -192,6 +193,11 @@ if __name__ == "__main__":
                        "Mean Mass update": torch.mean(physical_model.mass_updates).item(),
                        "Loss": loss.item()
                        })
+        del loss
+        del average_initial_velocity
+        del positions
+        del state
+        del model
 
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_optimized_velocity.pth")
 
@@ -204,6 +210,7 @@ if __name__ == "__main__":
     rest_lrs = training_config["lr"]
     warmup_start_frame = training_config["warmup_start_frame"]
 
+
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -212,30 +219,31 @@ if __name__ == "__main__":
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
                                                                          contact_params=contact_params, adapter=adapter)
-        if e == 0 and warmup_iters > 0:
-            print("Setting warmup LRs")
-            for param_group in optimizer.param_groups:
+        # if e == 0 and warmup_iters > 0:
+        #     print("Setting warmup LRs")
+        #     for param_group in optimizer.param_groups:
+        #
+        #         if param_group["name"] in warmup_lrs:
+        #             param_group["lr"] = warmup_lrs[param_group["name"]]
+        # if e == warmup_iters + 1 and warmup_iters > 0:
+        #     print("Setting Rest LRs")
+        #     for param_group in optimizer.param_groups:
+        #         if param_group["name"] in rest_lrs:
+        #             param_group["lr"] = rest_lrs[param_group["name"]]
+        # if e <= warmup_iters and warmup_iters > 0:
+        #     loss = lossfn(positions[warmup_start_frame:], positions_pseudo_gt[warmup_start_frame:])
+        #     loss.backward()
+        #     optimizer.step()
+        # else:
+        loss = lossfn(positions, positions_pseudo_gt)
+        loss.backward()
+        optimizer.step()
 
-                if param_group["name"] in warmup_lrs:
-                    param_group["lr"] = warmup_lrs[param_group["name"]]
-        if e == warmup_iters + 1 and warmup_iters > 0:
-            print("Setting Rest LRs")
-            for param_group in optimizer.param_groups:
-                if param_group["name"] in rest_lrs:
-                    param_group["lr"] = rest_lrs[param_group["name"]]
-        if e <= warmup_iters and warmup_iters > 0:
-            loss = lossfn(positions[warmup_start_frame:], positions_pseudo_gt[warmup_start_frame:])
-            loss.backward()
-            optimizer.step()
-        else:
-            loss = lossfn(positions, positions_pseudo_gt)
-            loss.backward()
-            optimizer.step()
-
+        average_initial_velocity = average_initial_velocity.detach().cpu()
+        detached_positions = positions.detach().cpu()
         if (e % training_config["logging_interval"] == 0 or e == epochs - 1):
             print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             losses.append(loss.item())
-
             estimated_mu = torch.mean(model.tet_materials[:, 0])
             estimated_lambda = torch.mean(model.tet_materials[:, 1])
             estimated_mu, estimated_lambda = neo_lame_to_classical_lame(estimated_mu, estimated_lambda)
@@ -246,16 +254,16 @@ if __name__ == "__main__":
             print(f"Mu estimate: {estimated_mu}")
             print(f"Lambda estimate: {estimated_lambda}")
 
-            mu_loss = torch.log10(estimated_mu) - torch.log10(gt_mu)
-            mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu)
-            lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda)
-            lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda)
+            mu_loss = torch.log10(estimated_mu) - torch.log10(gt_mu).item()
+            mu_mape = torch.abs((gt_mu - estimated_mu) / gt_mu).item()
+            lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda).item()
+            lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda).item()
 
             estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
             print(f"E estimate: {estimated_E}")
             print(f"Nu estimate: {estimated_nu}")
-            e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E))
-            nu_error = torch.abs(estimated_nu - gt_nu)
+            e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E)).item()
+            nu_error = torch.abs(estimated_nu - gt_nu).item()
 
             velocity_estimate_difference = torch.linalg.norm(average_initial_velocity)
             print(f"Velocity estimate: {average_initial_velocity}")
@@ -276,11 +284,19 @@ if __name__ == "__main__":
 
             torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_epoch_{e}.pth")
 
-        optimizer.zero_grad()
+        del lambda_loss, loss, mu_loss
+        del estimated_mu, estimated_lambda
+        del estimated_E, estimated_nu
+        del positions
+        del state
+        del model
+        optimizer.zero_grad(set_to_none=True)
+        gc.collect()
+        torch.cuda.empty_cache()
 
     # Make and save a numpy array of the states (for ease of loading into Blender)
-    save_positions(positions, f"{output_directory}/predicted.npz")
-
+    save_positions(detached_positions, f"{output_directory}/predicted.npz")
+    #
     # Save models
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
 
