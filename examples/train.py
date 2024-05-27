@@ -217,25 +217,25 @@ if __name__ == "__main__":
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
                                                                          contact_params=contact_params, adapter=adapter)
-        # if e == 0 and warmup_iters > 0:
-        #     print("Setting warmup LRs")
-        #     for param_group in optimizer.param_groups:
-        #
-        #         if param_group["name"] in warmup_lrs:
-        #             param_group["lr"] = warmup_lrs[param_group["name"]]
-        # if e == warmup_iters + 1 and warmup_iters > 0:
-        #     print("Setting Rest LRs")
-        #     for param_group in optimizer.param_groups:
-        #         if param_group["name"] in rest_lrs:
-        #             param_group["lr"] = rest_lrs[param_group["name"]]
-        # if e <= warmup_iters and warmup_iters > 0:
-        #     loss = lossfn(positions[warmup_start_frame:], positions_pseudo_gt[warmup_start_frame:])
-        #     loss.backward()
-        #     optimizer.step()
-        # else:
-        loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
-        loss.backward()
-        optimizer.step()
+        if e == 0 and warmup_iters > 0:
+            print("Setting warmup LRs")
+            for param_group in optimizer.param_groups:
+
+                if param_group["name"] in warmup_lrs:
+                    param_group["lr"] = warmup_lrs[param_group["name"]]
+        if e == warmup_iters + 1 and warmup_iters > 0:
+            print("Setting Rest LRs")
+            for param_group in optimizer.param_groups:
+                if param_group["name"] in rest_lrs:
+                    param_group["lr"] = rest_lrs[param_group["name"]]
+        if e <= warmup_iters and warmup_iters > 0:
+            loss = lossfn(positions[warmup_start_frame:training_config["frame_count"]], positions_pseudo_gt[warmup_start_frame:training_config["frame_count"]])
+            loss.backward()
+            optimizer.step()
+        else:
+            loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
+            loss.backward()
+            optimizer.step()
 
         average_initial_velocity = average_initial_velocity.detach().cpu()
         detached_positions = positions.detach().cpu()
@@ -270,13 +270,10 @@ if __name__ == "__main__":
                        "Mu": estimated_mu,
                        "Mu Relative Error": mu_mape,
                        "E Grad": physical_model.global_E.grad,
-                       # "Mu Grad": physical_model.mu_update.grad,
                        "Lambda": estimated_lambda,
                        "Lambda Relative Error": lambda_mape,
                        "Nu Grad": physical_model.global_nu.grad,
-                       # "Lambda Grad": physical_model.lambda_update.grad,
                        "Velocity Estimate Difference": velocity_estimate_difference,
-                       # "Velocity Grad magnitude": torch.linalg.norm(physical_model.velocity_update.grad).item(),
                        "LogE Abs Error": e_log_error,
                        "Nu Abs Error": nu_error})
 
