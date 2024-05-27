@@ -142,7 +142,6 @@ if __name__ == "__main__":
         positions_pseudo_gt = positions_pseudo_gt + scale * torch.rand_like(positions_pseudo_gt)
 
     # Do one run before training to get full duration unoptimized
-    df.config.no_grad = True
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
@@ -151,7 +150,6 @@ if __name__ == "__main__":
                                                       optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
-    df.config.no_grad = False
 
     epochs = training_config["epochs"]
     losses = []
@@ -235,7 +233,7 @@ if __name__ == "__main__":
         #     loss.backward()
         #     optimizer.step()
         # else:
-        loss = lossfn(positions, positions_pseudo_gt)
+        loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
         loss.backward()
         optimizer.step()
 
@@ -259,7 +257,7 @@ if __name__ == "__main__":
             lambda_loss = torch.log10(estimated_lambda) - torch.log10(gt_lambda).item()
             lambda_mape = torch.abs((gt_lambda - estimated_lambda) / gt_lambda).item()
 
-            estimated_E, estimated_nu = young_from_lame(estimated_mu, estimated_lambda)
+            estimated_E, estimated_nu = young_from_lame(estimated_mu.detach().cpu(), estimated_lambda.detach().cpu())
             print(f"E estimate: {estimated_E}")
             print(f"Nu estimate: {estimated_nu}")
             e_log_error = torch.abs(torch.log10(estimated_E) - torch.log10(gt_E)).item()
@@ -286,7 +284,6 @@ if __name__ == "__main__":
 
         del lambda_loss, loss, mu_loss
         del estimated_mu, estimated_lambda
-        del estimated_E, estimated_nu
         del positions
         del state
         del model
@@ -301,7 +298,6 @@ if __name__ == "__main__":
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
 
     # Evaluate
-    df.config.no_grad = True
     with torch.no_grad():
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
