@@ -1,19 +1,15 @@
 {
-  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/cow/cow.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/cow",
+  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/whale/whale.obj",
+  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/whale",
   "sim_duration": 2.0,
-  "sim_substeps": 5000,
+  "sim_substeps": 10000,
   "physics_engine_rate": 24,
-  "position": [
-    0,
-    0,
-    0
-  ],
+  "position": [0, 0, 0],
   "scale": 1.0,
   "initial_velocity": [
-    0.1,
-    -0.2,
-    0.03
+    0.05,
+    -0.25,
+    0.0
   ],
   "contact_params": {
     "ke": 1e4,
@@ -23,12 +19,12 @@
   },
   "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.5)",
   "density": 1000.0,
-  "mu": 2.78e5,
-  "lambda": 9.25e5,
+  "mu": 5.23e5,
+  "lambda": 4.32e5,
   "damp": 1,
   "training": {
     "path_to_gt": "",
-    "exp_name": "ball",
+    "exp_name": "whale",
     "frame_count": 12,
     "velocity_epochs": 1,
     "velocity_frames": 4,
