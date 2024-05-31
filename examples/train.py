@@ -167,7 +167,7 @@ if __name__ == "__main__":
     vs = torch.stack(
         [positions_pseudo_gt[1] - positions_pseudo_gt[0], positions_pseudo_gt[2] - positions_pseudo_gt[1],
          positions_pseudo_gt[3] - positions_pseudo_gt[2]])
-    print("Optimizing velocity")
+    print("Optimizing velocity: ")
     for e in range(velocity_epochs):
         if "velocity" not in optimization_set:
             break
@@ -195,7 +195,7 @@ if __name__ == "__main__":
             wandb.log({"Velocity Estimate Difference": torch.linalg.norm(physical_model.global_velocity),
                        "Velocity Grad magnitude": torch.linalg.norm(physical_model.global_velocity.grad).item(),
                        "Mean Mass update": torch.mean(physical_model.mass_updates).item(),
-                       "Loss": loss.item()
+                       "Velocity Loss": loss.item()
                        })
         del loss
         del average_initial_velocity
