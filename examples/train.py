@@ -16,7 +16,6 @@ from losses import *
 
 from logging_utils import wandb_log_curve
 
-
 if __name__ == "__main__":
     print(f"Found cuda device {torch.cuda.get_device_name(0)}")
     parser = argparse.ArgumentParser()
@@ -55,7 +54,6 @@ if __name__ == "__main__":
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
     adapter = training_config["adapter"]
     print(f"Using adapter (aka device): {adapter}")
-
 
     np.savez(f"{output_directory}/vertices.npz", points)
     np.savez(f"{output_directory}/tets.npz", tet_indices)
@@ -142,12 +140,14 @@ if __name__ == "__main__":
         positions_pseudo_gt = positions_pseudo_gt + scale * torch.rand_like(positions_pseudo_gt)
 
     # Do one run before training to get full duration unoptimized
+    print("Running unoptimized...")
     with torch.no_grad():
         unoptimized_positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
                                                       sim_dt, render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                                      optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
+                                                      optimization_set=optimization_set, contact_params=contact_params,
+                                                      adapter=adapter)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -164,6 +164,10 @@ if __name__ == "__main__":
     velocity_optimizer = initialize_velocity_optimizer(training_config, physical_model)
 
     positions_pseudo_gt = positions_pseudo_gt.to(torch.device(adapter))
+    vs = torch.stack(
+        [positions_pseudo_gt[1] - positions_pseudo_gt[0], positions_pseudo_gt[2] - positions_pseudo_gt[1],
+         positions_pseudo_gt[3] - positions_pseudo_gt[2]])
+    print("Optimizing velocity")
     for e in range(velocity_epochs):
         if "velocity" not in optimization_set:
             break
@@ -178,7 +182,9 @@ if __name__ == "__main__":
                                                                          fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
                                                                          contact_params=contact_params, adapter=adapter)
-        loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
+        vs_pred = torch.stack([positions[1] - positions[0], positions[2] - positions[1], positions[3] - positions[2]])
+        # loss = lossfn(positions, positions_pseudo_gt[:training_config["velocity_frames"]])
+        loss = torch.mean((torch.mean(vs_pred, axis=1) - torch.mean(vs, axis=1))**2)
         loss.backward()
         velocity_optimizer.step()
 
@@ -208,7 +214,7 @@ if __name__ == "__main__":
     rest_lrs = training_config["lr"]
     warmup_start_frame = training_config["warmup_start_frame"]
 
-
+    print("Optimizing Elasticity:")
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -217,30 +223,30 @@ if __name__ == "__main__":
                                                                          physical_model, fix_top_plane=fix_top_plane,
                                                                          optimization_set=optimization_set,
                                                                          contact_params=contact_params, adapter=adapter)
-        if e == 0 and warmup_iters > 0:
-            print("Setting warmup LRs")
-            for param_group in optimizer.param_groups:
-
-                if param_group["name"] in warmup_lrs:
-                    param_group["lr"] = warmup_lrs[param_group["name"]]
-        if e == warmup_iters + 1 and warmup_iters > 0:
-            print("Setting Rest LRs")
-            for param_group in optimizer.param_groups:
-                if param_group["name"] in rest_lrs:
-                    param_group["lr"] = rest_lrs[param_group["name"]]
-        if e <= warmup_iters and warmup_iters > 0:
-            loss = lossfn(positions[warmup_start_frame:training_config["frame_count"]], positions_pseudo_gt[warmup_start_frame:training_config["frame_count"]])
-            loss.backward()
-            optimizer.step()
-        else:
-            loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
-            loss.backward()
-            optimizer.step()
+        # if e == 0 and warmup_iters > 0:
+        #     print("Setting warmup LRs")
+        #     for param_group in optimizer.param_groups:
+        #
+        #         if param_group["name"] in warmup_lrs:
+        #             param_group["lr"] = warmup_lrs[param_group["name"]]
+        # if e == warmup_iters + 1 and warmup_iters > 0:
+        #     print("Setting Rest LRs")
+        #     for param_group in optimizer.param_groups:
+        #         if param_group["name"] in rest_lrs:
+        #             param_group["lr"] = rest_lrs[param_group["name"]]
+        # if e <= warmup_iters and warmup_iters > 0:
+        #     loss = lossfn(positions[warmup_start_frame:training_config["frame_count"]], positions_pseudo_gt[warmup_start_frame:training_config["frame_count"]])
+        #     loss.backward()
+        #     optimizer.step()
+        # else:
+        loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
+        loss.backward()
+        optimizer.step()
 
         average_initial_velocity = average_initial_velocity.detach().cpu()
         detached_positions = positions.detach().cpu()
         if (e % training_config["logging_interval"] == 0 or e == epochs - 1):
-            print(f"Epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
+            print(f"Completed epoch: {(e + 1):03d}/{epochs:03d} - Loss: {loss.item():.5f}")
             losses.append(loss.item())
             estimated_mu = torch.mean(model.tet_materials[:, 0])
             estimated_lambda = torch.mean(model.tet_materials[:, 1])
@@ -279,8 +285,8 @@ if __name__ == "__main__":
 
             torch.save(physical_model.state_dict(), f"{output_directory}/physical_model_epoch_{e}.pth")
 
-        del lambda_loss, loss, mu_loss
-        del estimated_mu, estimated_lambda
+            del lambda_loss, loss, mu_loss
+            del estimated_mu, estimated_lambda
         del positions
         del state
         del model
@@ -295,11 +301,13 @@ if __name__ == "__main__":
     torch.save(physical_model.state_dict(), f"{output_directory}/physical_model.pth")
 
     # Evaluate
+    print("Running evaluation...")
     with torch.no_grad():
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                          optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
+                                          optimization_set=optimization_set, contact_params=contact_params,
+                                          adapter=adapter)
     total_error = lossfn(positions[:len(positions_pseudo_gt)], positions_pseudo_gt)
     print(f"Evaluation Error: {total_error}")
     run.summary["Evaluation Error"] = total_error
