@@ -60,7 +60,7 @@ if __name__ == "__main__":
         positions, model, state, average_initial_velocity = forward_pass(position, r,
                                                                          scale, velocity, points, tet_indices, density,
                                                                          k_mu, k_lambda, k_damp,
-                                                                         sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane, contact_params=contact_params)
+                                                                         sim_steps, sim_dt, render_steps, fix_top_plane=fix_top_plane, contact_params=contact_params, adapter="cuda")
     # Output results
     masses = model.particle_inv_mass.detach().cpu().numpy()
     np.savez(f"{outdir}/particle_inv_mass.npz", masses)

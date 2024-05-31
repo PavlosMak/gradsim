@@ -1,0 +1,64 @@
+{
+  "mesh": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/elastic_2/elastic_2_full.obj",
+  "outdir": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/elastic_2",
+  "sim_duration": 0.6,
+  "sim_substeps": 10000,
+  "physics_engine_rate": 24,
+  "position": [0, 0, 0],
+  "scale": 1,
+  "initial_velocity": [-0.07416970970417203, -0.5,  -0.18773877702753472],
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+  "density": 550,
+  "damp": 10,
+  "mu": 250272.3762178533,
+  "lambda": 338523.59006857924,
+  "contact_params": {
+    "ke": 1200,
+    "kd": 3.0,
+    "kf": 10,
+    "mu": 0.5
+  },
+  "training": {
+    "path_to_gt": "",
+    "exp_name": "elastic_2",
+    "frame_count": 9,
+    "epochs": 1,
+    "velocity_epochs": 0,
+    "velocity_frames": 4,
+    "warmup_iters": 0,
+    "warmup_start_frame": 6,
+    "seed": 42,
+    "E_initialization": "torch.tensor(316228)",
+    "nu_initialization": "torch.tensor(0.25)",
+    "lr": {
+      "E": 0.1,
+      "nu": 0.001,
+      "velocity": 0.25,
+      "mass": 0.1
+    },
+    "warmup_lr": {
+      "nu": 0.005,
+      "E": 0.1
+    },
+    "optimize": [
+      "velocity",
+      "mu",
+      "lambda"
+    ],
+    "loss": {
+      "name": "chamfer",
+      "batch_reduction": "mean"
+    },
+    "offset_floor": [0, 0, 0],
+    "compare_every": 3,
+    "logging_interval": 5,
+    "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
+    "sim_scale": 1,
+    "gt_scale": 1,
+    "training_mesh": "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/elastic_2/elastic_2.obj",
+    "eval_for": 1,
+    "gt_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 1.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
+    "transform_gt_points": true
+  }
+}
