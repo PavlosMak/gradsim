@@ -1,18 +1,18 @@
 {
-  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/torus/torus.obj",
-  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/torus",
+  "mesh": "/media/pavlos/One Touch/datasets/our_baseline/cow_y_fall/cow.obj",
+  "outdir": "/media/pavlos/One Touch/datasets/our_baseline/cow_y_fall",
   "sim_duration": 2.0,
-  "sim_substeps": 1500,
+  "sim_substeps": 5000,
   "physics_engine_rate": 24,
   "position": [
     0,
     0,
     0
   ],
-  "scale": 0.85,
+  "scale": 1.0,
   "initial_velocity": [
-    0,
     0.0,
+    -0.2,
     0.0
   ],
   "contact_params": {
@@ -21,21 +21,20 @@
     "kf": 30,
     "mu": 0.5
   },
-  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), -math.pi * 0.5)",
-  "density": 100.0,
-  "mu": 1.0e4,
-  "lambda": 1.0e4,
+  "initial_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), math.pi * 0.5)",
+  "density": 1000.0,
+  "mu": 2.78e5,
+  "lambda": 9.25e5,
   "damp": 1,
   "training": {
-    "adapter": "cuda",
-    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/young-puddle/pseudo_gt_positions.npz",
-    "exp_name": "torus",
-    "frame_count": 13,
+    "path_to_gt": "",
+    "exp_name": "ball",
+    "frame_count": 12,
     "velocity_epochs": 1,
     "velocity_frames": 4,
-    "warmup_iters": 0,
+    "warmup_iters": 15,
     "warmup_start_frame": 6,
-    "epochs": 1,
+    "epochs": 950,
     "seed": 42,
     "lr": {
       "E": 0.1,
@@ -68,7 +67,7 @@
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 1,
     "gt_scale": 1,
-    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/fast-water/training_mesh.obj",
+    "training_mesh": "",
     "eval_for": 40,
     "gt_rotation": "df.quat_multiply(df.quat_from_axis_angle((0.0, 1.0, 0.0), 1.0 * math.pi), df.quat_from_axis_angle((0.0, 0.0, 1.0), 0.5 * math.pi))",
     "sim_mesh_rotation": "df.quat_from_axis_angle((0.0, 1.0, 0.0), 0.0 * math.pi)",

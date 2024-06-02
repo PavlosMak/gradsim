@@ -13,7 +13,7 @@ from examples.training_utils import load_gt_positions, forward_pass
 
 output_dir = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/output"
 
-path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/thinner_torus.json"
+path_to_config = "/home/pavlos/Desktop/stuff/Uni-Masters/thesis/gradsim/examples/sampledata/configs/our_baseline/torus.json"
 
 with open(path_to_config) as config_file:
     simulation_config = json.load(config_file)
@@ -64,7 +64,7 @@ def get_loss(x, y) -> float:
         positions, _, _, _ = forward_pass(position, df.quat_identity(),
                                           scale, velocity, points, tet_indices, density,
                                           k_mu, k_lambda, k_damp, training_sim_steps,
-                                          sim_dt, render_steps)
+                                          sim_dt, render_steps, adapter="cuda")
         save_positions(positions, f"{output_dir}/positions_pred.npz")
         loss = mse(positions, positions_pseudo_gt[:training_frame_count])
     return loss.item()

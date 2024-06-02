@@ -19,11 +19,12 @@
     "mu": 0.5
   },
   "training": {
+    "adapter": "cuda",
     "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/neat-cloud/pseudo_gt_positions.npz",
     "exp_name": "elastic_1",
     "frame_count": 9,
     "epochs": 1,
-    "velocity_epochs": 0,
+    "velocity_epochs": 1,
     "velocity_frames": 4,
     "warmup_iters": 0,
     "warmup_start_frame": 6,

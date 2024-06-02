@@ -27,7 +27,8 @@
   "lambda": 4.5e4,
   "damp": 1,
   "training": {
-    "path_to_gt": "",
+    "adapter": "cuda",
+    "path_to_gt": "/media/pavlos/One Touch/datasets/gt_generation/usual-valley/pseudo_gt_positions.npz",
     "exp_name": "ball",
     "frame_count": 12,
     "velocity_epochs": 1,
@@ -67,10 +68,10 @@
     "logdir": "/media/pavlos/One Touch/datasets/inverse_physics_results",
     "sim_scale": 1,
     "gt_scale": 1,
-    "training_mesh": "",
+    "training_mesh": "/media/pavlos/One Touch/datasets/gt_generation/usual-valley/training_mesh.obj",
     "eval_for": 40,
     "gt_rotation": "df.quat_multiply(df.quat_from_axis_angle((0.0, 1.0, 0.0), 1.0 * math.pi), df.quat_from_axis_angle((0.0, 0.0, 1.0), 0.5 * math.pi))",
-    "sim_mesh_rotation": "df.quat_from_axis_angle((0.0, 1.0, 0.0), 0.0 * math.pi)",
+    "sim_mesh_rotation": "df.quat_from_axis_angle((1.0, 0.0, 0.0), 0.5 * math.pi)",
     "transform_gt_points": true
   }
 }

@@ -16,7 +16,6 @@ from losses import *
 
 from logging_utils import wandb_log_curve
 
-
 if __name__ == "__main__":
     print(f"Found cuda device {torch.cuda.get_device_name(0)}")
     parser = argparse.ArgumentParser()
@@ -55,7 +54,6 @@ if __name__ == "__main__":
     print(f"Fitting simulation with {len(points)} particles and {tet_count} tetrahedra")
     adapter = training_config["adapter"]
     print(f"Using adapter (aka device): {adapter}")
-
 
     np.savez(f"{output_directory}/vertices.npz", points)
     np.savez(f"{output_directory}/tets.npz", tet_indices)
@@ -147,7 +145,8 @@ if __name__ == "__main__":
                                                       scale, velocity, points, tet_indices, density,
                                                       k_mu, k_lambda, k_damp, eval_sim_steps,
                                                       sim_dt, render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                                      optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
+                                                      optimization_set=optimization_set, contact_params=contact_params,
+                                                      adapter=adapter)
 
     save_positions(unoptimized_positions, f"{output_directory}/unoptimized.npz")
 
@@ -208,7 +207,6 @@ if __name__ == "__main__":
     rest_lrs = training_config["lr"]
     warmup_start_frame = training_config["warmup_start_frame"]
 
-
     for e in range(epochs):
         positions, model, state, average_initial_velocity = forward_pass(position, df.quat_identity(),
                                                                          scale, velocity, points, tet_indices, density,
@@ -229,11 +227,13 @@ if __name__ == "__main__":
                 if param_group["name"] in rest_lrs:
                     param_group["lr"] = rest_lrs[param_group["name"]]
         if e <= warmup_iters and warmup_iters > 0:
-            loss = lossfn(positions[warmup_start_frame:training_config["frame_count"]], positions_pseudo_gt[warmup_start_frame:training_config["frame_count"]])
+            loss = lossfn(positions[warmup_start_frame:training_config["frame_count"]],
+                          positions_pseudo_gt[warmup_start_frame:training_config["frame_count"]])
             loss.backward()
             optimizer.step()
         else:
-            loss = lossfn(positions[:training_config["frame_count"]], positions_pseudo_gt[:training_config["frame_count"]])
+            loss = lossfn(positions[:training_config["frame_count"]],
+                          positions_pseudo_gt[:training_config["frame_count"]])
             loss.backward()
             optimizer.step()
 
@@ -299,7 +299,8 @@ if __name__ == "__main__":
         positions, _, _, _ = forward_pass(position, df.quat_identity(), scale, velocity, points,
                                           tet_indices, density, k_mu, k_lambda, k_damp, eval_sim_steps, sim_dt,
                                           render_steps, physical_model, fix_top_plane=fix_top_plane,
-                                          optimization_set=optimization_set, contact_params=contact_params, adapter=adapter)
+                                          optimization_set=optimization_set, contact_params=contact_params,
+                                          adapter=adapter)
     total_error = lossfn(positions[:len(positions_pseudo_gt)], positions_pseudo_gt)
     print(f"Evaluation Error: {total_error}")
     run.summary["Evaluation Error"] = total_error
